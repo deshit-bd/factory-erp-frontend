@@ -211,34 +211,23 @@ function ChevronLeftIcon({ collapsed }) {
   );
 }
 
-export function AppSidebar({ collapsed = false, onToggleCollapsed }) {
-  return (
-    <aside
-      className="relative hidden min-h-[calc(100vh-74px)] border-r border-[#2a3346] bg-[#1f2940] text-white transition-[width] duration-200 md:block"
-      style={{ width: collapsed ? "56px" : "220px" }}
-    >
-      <button
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="absolute -right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-[#3a465b] bg-[#263248] text-[#c8d0db] shadow-[0_2px_10px_rgba(0,0,0,0.2)] transition hover:text-white"
-        onClick={onToggleCollapsed}
-        type="button"
-      >
-        <ChevronLeftIcon collapsed={collapsed} />
-      </button>
-
-      <div className={["flex h-full flex-col overflow-y-auto py-3", collapsed ? "px-1.5" : "px-3"].join(" ")}>
+export function AppSidebar({ collapsed = false, onToggleCollapsed, mobileOpen = false, onCloseMobile, onNavigate }) {
+  function SidebarNav({ mobile = false, onNavigate: handleNavigate }) {
+    return (
+      <div className={["flex h-full flex-col overflow-y-auto py-3", collapsed && !mobile ? "px-1.5" : "px-3"].join(" ")}>
         <nav aria-label="Sidebar navigation" className="flex flex-col gap-[2px]">
           {sidebarItems.map((item) => (
             <NavLink
               className={({ isActive }) =>
                 [
                   "flex min-h-[28px] items-center rounded-[2px] text-left text-[11px] leading-none transition",
-                  collapsed ? "justify-center px-0" : "gap-2 px-3",
+                  collapsed && !mobile ? "justify-center px-0" : "gap-2 px-3",
                   isActive ? "bg-[#f5a30f] font-semibold text-[#172136]" : "text-white/88 hover:bg-white/6",
                 ].join(" ")
               }
               end={item.path === "/"}
               key={item.label}
+              onClick={() => handleNavigate?.()}
               title={item.label}
               to={item.path}
             >
@@ -247,8 +236,8 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed }) {
                   <span className={isActive ? "text-[#172136]" : "text-white/88"}>
                     <Icon type={item.icon} />
                   </span>
-                  {!collapsed ? <span className="truncate">{item.label}</span> : null}
-                  {!collapsed && item.badge ? (
+                  {collapsed && !mobile ? null : <span className="truncate">{item.label}</span>}
+                  {(!collapsed || mobile) && item.badge ? (
                     <span className="ml-auto flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#f5a30f] text-[8px] font-bold text-[#172136]">
                       {item.badge}
                     </span>
@@ -259,6 +248,37 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed }) {
           ))}
         </nav>
       </div>
-    </aside>
+    );
+  }
+
+  return (
+    <>
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-40 bg-[#0d1422]/70 md:hidden" onClick={onCloseMobile} role="presentation">
+          <aside
+            className="h-full w-[260px] border-r border-[#2a3346] bg-[#1f2940] text-white shadow-[0_20px_60px_rgba(0,0,0,0.35)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SidebarNav mobile onNavigate={onNavigate} />
+          </aside>
+        </div>
+      ) : null}
+
+      <aside
+        className="relative hidden min-h-[calc(100vh-74px)] border-r border-[#2a3346] bg-[#1f2940] text-white transition-[width] duration-200 md:block"
+        style={{ width: collapsed ? "56px" : "220px" }}
+      >
+        <button
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="absolute -right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-[#3a465b] bg-[#263248] text-[#c8d0db] shadow-[0_2px_10px_rgba(0,0,0,0.2)] transition hover:text-white"
+          onClick={onToggleCollapsed}
+          type="button"
+        >
+          <ChevronLeftIcon collapsed={collapsed} />
+        </button>
+
+        <SidebarNav onNavigate={onNavigate} />
+      </aside>
+    </>
   );
 }

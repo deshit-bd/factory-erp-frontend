@@ -167,8 +167,8 @@ export function ProjectsPage() {
             />
           </label>
 
-          <div className="mt-4 overflow-hidden">
-            <table className="w-full table-fixed border-collapse text-left">
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[880px] table-fixed border-collapse text-left">
               <thead>
                 <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
                   <th className="w-[90px] pb-3 font-medium">Project ID</th>

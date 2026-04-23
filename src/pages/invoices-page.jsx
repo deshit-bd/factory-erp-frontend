@@ -222,8 +222,8 @@ export function InvoicesPage() {
       </div>
 
       <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
-        <div className="overflow-hidden">
-          <table className="w-full table-fixed border-collapse text-left">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
                 <th className="w-[12%] pb-3 font-medium">Invoice ID</th>
@@ -272,8 +272,8 @@ export function InvoicesPage() {
       </article>
 
       {isCreateOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1422]/70 px-4 py-8">
-          <div className="w-full max-w-[520px] overflow-hidden rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0d1422]/70 px-4 py-4">
+          <div className="w-full max-h-[calc(100vh-2rem)] max-w-[520px] overflow-y-auto rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[#314058] px-4 py-4">
               <h3 className="text-[22px] font-semibold text-[#e6ebf4]">Create Invoice</h3>
               <button className="text-[#d7deea] transition hover:text-white" onClick={closeCreateModal} type="button">

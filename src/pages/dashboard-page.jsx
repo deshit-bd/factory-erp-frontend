@@ -183,8 +183,8 @@ export function DashboardPage() {
           <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7f8ea6]">
             Recent Projects
           </div>
-          <div>
-            <table className="w-full table-fixed border-collapse text-left">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] table-fixed border-collapse text-left">
               <thead>
                 <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.12em] text-[#7f8ea6]">
                   <th className="w-[100px] pb-3 font-medium">Project ID</th>

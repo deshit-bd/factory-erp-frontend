@@ -225,8 +225,8 @@ export function MaterialPurchasePage() {
           </button>
         </div>
 
-        <div className="mt-4 overflow-hidden">
-          <table className="w-full table-fixed border-collapse text-left">
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[920px] table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
                 <th className="w-[120px] pb-3 font-medium">Purchase ID</th>
@@ -262,8 +262,8 @@ export function MaterialPurchasePage() {
       </article>
 
       {isAddPurchaseModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1422]/70 px-4 py-8">
-          <div className="w-full max-w-[760px] overflow-hidden rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0d1422]/70 px-4 py-4">
+          <div className="w-full max-h-[calc(100vh-2rem)] max-w-[760px] overflow-y-auto rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[#314058] px-4 py-4">
               <h3 className="text-[24px] font-semibold text-[#e6ebf4]">Add Material Purchase</h3>
               <button className="text-[#d7deea] transition hover:text-white" onClick={closeAddPurchaseModal} type="button">

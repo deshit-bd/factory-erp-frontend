@@ -8,6 +8,7 @@ import { useState } from "react";
 
 export function AppLayout({ children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const location = useLocation();
   const sidebarWidth = sidebarCollapsed ? 56 : 220;
   const activeItem = getSidebarItemByPath(location.pathname);
@@ -15,13 +16,21 @@ export function AppLayout({ children }) {
 
   return (
     <>
-      <AppTopbar sidebarCollapsed={sidebarCollapsed} sidebarWidth={sidebarWidth} title={activeItem.label} />
+      <AppTopbar
+        onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+        sidebarCollapsed={sidebarCollapsed}
+        sidebarWidth={sidebarWidth}
+        title={activeItem.label}
+      />
       <div
         className="w-full min-w-0 md:grid md:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]"
         style={{ "--sidebar-width": `${sidebarWidth}px` }}
       >
         <AppSidebar
           collapsed={sidebarCollapsed}
+          mobileOpen={mobileSidebarOpen}
+          onNavigate={() => setMobileSidebarOpen(false)}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
           onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
         />
         {content ? <PageShell>{content}</PageShell> : null}

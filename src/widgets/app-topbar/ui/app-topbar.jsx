@@ -26,7 +26,15 @@ function BellIcon() {
   );
 }
 
-export function AppTopbar({ title = "Dashboard", sidebarWidth = 220, sidebarCollapsed = false }) {
+function MenuIcon() {
+  return (
+    <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+export function AppTopbar({ title = "Dashboard", sidebarWidth = 220, sidebarCollapsed = false, onOpenMobileSidebar }) {
   return (
     <header className="border-b border-[#2d384c] bg-[#1e2737] text-white">
       <div
@@ -54,13 +62,21 @@ export function AppTopbar({ title = "Dashboard", sidebarWidth = 220, sidebarColl
         </div>
 
         <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-start gap-3">
+            <button
+              aria-label="Open navigation"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#344056] bg-[#202b3d] text-[#c5cfdd] md:hidden"
+              onClick={onOpenMobileSidebar}
+              type="button"
+            >
+              <MenuIcon />
+            </button>
             <h1 className="truncate text-[18px] font-semibold text-white">{title}</h1>
-            <p className="mt-0.5 text-[12px] text-[#93a0b4]">Sunday, April 19, 2026</p>
+            <p className="mt-0.5 hidden text-[12px] text-[#93a0b4] sm:block">Sunday, April 19, 2026</p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-sm border border-[#344056] bg-[#202b3d] px-3 text-[#7e8aa2] md:w-[340px] md:flex-none">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="order-3 flex h-10 min-w-0 basis-full items-center gap-2 rounded-sm border border-[#344056] bg-[#202b3d] px-3 text-[#7e8aa2] sm:order-1 sm:flex-1 md:order-none md:w-[340px] md:flex-none">
               <SearchIcon />
               <input
                 className="w-full bg-transparent text-[13px] text-white outline-none placeholder:text-[#7e8aa2]"
