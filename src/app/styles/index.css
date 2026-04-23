@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #132238;
+  --color-ink-700: #516275;
+  --color-brand-700: #0b667e;
+  --color-brand-600: #17876b;
+  --color-surface-50: #f4f7f5;
+  --color-surface-100: #ebf2ef;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    min-width: 320px;
+    background: linear-gradient(180deg, #131d2e 0%, #111a29 100%);
+    color: var(--color-ink-950);
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+}
