@@ -214,10 +214,10 @@ export function ProjectsPage() {
                     </td>
                     <td className="py-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-1.5 w-14 rounded-full bg-[#3a465b]">
-                          <div className="h-1.5 rounded-full bg-[#f7a614]" style={{ width: `${project.progress}%` }} />
+                        <div className="h-1.5 w-14 rounded-full bg-[#dbeafe]">
+                          <div className="h-1.5 rounded-full bg-[#2563eb]" style={{ width: `${project.progress}%` }} />
                         </div>
-                        <span className="text-[11px] text-[#7f8ea6]">{project.progress}%</span>
+                        <span className="text-[11px] text-[#64748b]">{project.progress}%</span>
                       </div>
                     </td>
                   </tr>

@@ -4,7 +4,7 @@ const initialDailyCosts = [
   {
     id: "FC-001",
     category: "Electricity",
-    amount: "$450",
+    amount: "৳450",
     date: "2026-04-17",
     receipt: "-",
   },
@@ -14,7 +14,7 @@ const initialMonthlyCosts = [
   {
     id: "FC-002",
     category: "Rent",
-    amount: "$15,000",
+    amount: "৳15,000",
     date: "2026-04-01",
     receipt: "-",
   },
@@ -69,7 +69,7 @@ export function FactoryCostsPage() {
   });
 
   const costs = activeTab === "daily" ? dailyCosts : monthlyCosts;
-  const totalAmount = costs.reduce((sum, item) => sum + Number(item.amount.replace(/[$,]/g, "")), 0);
+  const totalAmount = costs.reduce((sum, item) => sum + Number(item.amount.replace(/[^\d.-]/g, "")), 0);
 
   function handleExport() {
     const header = ["ID", "Category", "Amount", "Date", "Receipt"];
@@ -120,7 +120,7 @@ export function FactoryCostsPage() {
     const nextItem = {
       id: `FC-${padded}`,
       category: formValues.category,
-      amount: `$${Number(formValues.amount || 0).toLocaleString("en-US")}`,
+      amount: `৳${Number(formValues.amount || 0).toLocaleString("en-US")}`,
       date: formValues.date,
       receipt: formValues.receiptName || "-",
     };
@@ -190,7 +190,7 @@ export function FactoryCostsPage() {
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9cb0]">
             {activeTab === "daily" ? "Total Daily Costs" : "Total Monthly Costs"}
           </div>
-          <div className="text-[36px] font-semibold leading-none text-[#f7a614]">${totalAmount.toLocaleString("en-US")}</div>
+          <div className="text-[36px] font-semibold leading-none text-[#f7a614]">৳{totalAmount.toLocaleString("en-US")}</div>
         </div>
       </article>
 
@@ -248,7 +248,7 @@ export function FactoryCostsPage() {
               </label>
 
               <label className="block space-y-2">
-                <span className="text-[14px] font-medium text-[#d6ddea]">Amount ($) *</span>
+                <span className="text-[14px] font-medium text-[#d6ddea]">Amount (৳) *</span>
                 <input
                   className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
                   name="amount"

@@ -7,11 +7,11 @@ const initialPayments = [
     supplier: "Metal Suppliers Inc",
     project: "PRJ-001",
     status: "Partial",
-    totalPaid: "$3,000",
-    remainingDue: "$3,000",
+    totalPaid: "৳3,000",
+    remainingDue: "৳3,000",
     date: "2026-04-16",
     paymentMethod: "Mobile Banking",
-    previousDueAmount: "$6,000",
+    previousDueAmount: "৳6,000",
     invoiceId: "PINV-001",
   },
 ];
@@ -106,8 +106,8 @@ export function SupplierPaymentsPage() {
     date: "",
   });
 
-  const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.totalPaid.replace(/[$,]/g, "")), 0);
-  const totalDue = payments.reduce((sum, payment) => sum + Number(payment.remainingDue.replace(/[$,]/g, "")), 0);
+  const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.totalPaid.replace(/[^\d.-]/g, "")), 0);
+  const totalDue = payments.reduce((sum, payment) => sum + Number(payment.remainingDue.replace(/[^\d.-]/g, "")), 0);
   const totalSuppliers = new Set(payments.map((payment) => payment.supplier)).size;
 
   function handleExport() {
@@ -176,11 +176,11 @@ export function SupplierPaymentsPage() {
         supplier: formValues.supplier,
         project: formValues.project,
         status: remaining > 0 ? "Partial" : "Paid",
-        totalPaid: `$${paid.toLocaleString("en-US")}`,
-        remainingDue: `$${remaining.toLocaleString("en-US")}`,
+        totalPaid: `৳${paid.toLocaleString("en-US")}`,
+        remainingDue: `৳${remaining.toLocaleString("en-US")}`,
         date: formValues.date,
         paymentMethod: formValues.paymentMethod,
-        previousDueAmount: `$${previous.toLocaleString("en-US")}`,
+        previousDueAmount: `৳${previous.toLocaleString("en-US")}`,
         invoiceId: `PINV-${padded}`,
       },
     ]);
@@ -192,13 +192,13 @@ export function SupplierPaymentsPage() {
     <section className="w-full min-w-0 space-y-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-[18px] font-semibold leading-none text-[#e6ebf4]">Supplier Payments</h2>
-          <p className="mt-2 text-[11px] text-[#8f9cb0]">Track payments with auto invoice generation and due management</p>
+          <h2 className="text-[18px] font-semibold leading-none text-[var(--app-text)]">Supplier Payments</h2>
+          <p className="mt-2 text-[11px] text-[var(--app-text-muted)]">Track payments with auto invoice generation and due management</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
           <button
-            className="inline-flex items-center gap-2 rounded-[6px] border border-[#f6a313] px-5 py-3 text-[12px] font-medium text-white transition hover:bg-[#f6a313]/10"
+            className="inline-flex items-center gap-2 rounded-[6px] border border-[#2563eb] px-5 py-3 text-[12px] font-medium text-[#2563eb] transition hover:bg-[#2563eb]/10"
             onClick={handleExport}
             type="button"
           >
@@ -206,7 +206,7 @@ export function SupplierPaymentsPage() {
             Export
           </button>
           <button
-            className="inline-flex items-center gap-2 rounded-[6px] bg-[#f6a313] px-5 py-3 text-[12px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+            className="inline-flex items-center gap-2 rounded-[6px] bg-[#2563eb] px-5 py-3 text-[12px] font-medium text-white transition hover:bg-[#1d4ed8]"
             onClick={openRecordModal}
             type="button"
           >
@@ -217,25 +217,25 @@ export function SupplierPaymentsPage() {
       </div>
 
       <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <article className="rounded-[4px] border border-[#6a4d1a] bg-[#2f2b2a] px-4 py-4">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-[#8d9ab0]">Total Paid</div>
-          <div className="mt-2 text-[15px] font-semibold text-[#f7a614]">${totalPaid.toLocaleString("en-US")}</div>
+        <article className="rounded-[4px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--app-text-soft)]">Total Paid</div>
+          <div className="mt-2 text-[15px] font-semibold text-[#2563eb]">৳{totalPaid.toLocaleString("en-US")}</div>
         </article>
-        <article className="rounded-[4px] border border-[#693245] bg-[#2d2234] px-4 py-4">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-[#8d9ab0]">Total Due</div>
-          <div className="mt-2 text-[15px] font-semibold text-[#ef4444]">${totalDue.toLocaleString("en-US")}</div>
+        <article className="rounded-[4px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--app-text-soft)]">Total Due</div>
+          <div className="mt-2 text-[15px] font-semibold text-[#ef4444]">৳{totalDue.toLocaleString("en-US")}</div>
         </article>
-        <article className="rounded-[4px] border border-[#314058] bg-[#222d40] px-4 py-4">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-[#8d9ab0]">Total Suppliers</div>
-          <div className="mt-2 text-[28px] font-semibold leading-none text-[#e6ebf4]">{totalSuppliers}</div>
+        <article className="rounded-[4px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--app-text-soft)]">Total Suppliers</div>
+          <div className="mt-2 text-[28px] font-semibold leading-none text-[var(--app-text)]">{totalSuppliers}</div>
         </article>
       </section>
 
-      <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
+      <article className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
             <thead>
-              <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
+              <tr className="border-b border-[var(--app-border)] text-[10px] uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                 <th className="w-[11%] pb-3 font-medium">Payment ID</th>
                 <th className="w-[10%] pb-3 font-medium">Date</th>
                 <th className="w-[17%] pb-3 font-medium">Supplier</th>
@@ -249,27 +249,27 @@ export function SupplierPaymentsPage() {
             </thead>
             <tbody>
               {payments.map((payment) => (
-                <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={payment.id}>
-                  <td className="py-4 font-semibold text-[#f7a614]">{payment.id}</td>
-                  <td className="py-4 text-[#98a5bb]">{payment.date}</td>
+                <tr className="border-b border-[var(--app-border)] text-[13px] text-[var(--app-text)]" key={payment.id}>
+                  <td className="py-4 font-semibold text-[#2563eb]">{payment.id}</td>
+                  <td className="py-4 text-[var(--app-text-muted)]">{payment.date}</td>
                   <td className="py-4 pr-3">{payment.supplier}</td>
                   <td className="py-4">{payment.project}</td>
                   <td className="py-4">
-                    <span className="inline-flex rounded-sm bg-[#4b5568] px-2 py-1 text-[10px] font-medium text-[#dbe3ef]">
+                    <span className="inline-flex rounded-full bg-[#e2e8f0] px-2.5 py-1 text-[10px] font-medium text-[#64748b]">
                       {payment.paymentMethod}
                     </span>
                   </td>
-                  <td className="py-4 font-semibold text-[#f7a614]">{payment.totalPaid}</td>
+                  <td className="py-4 font-semibold text-[#2563eb]">{payment.totalPaid}</td>
                   <td className="py-4 font-semibold text-[#ef4444]">{payment.remainingDue}</td>
                   <td className="py-4">
-                    <span className="inline-flex rounded-sm bg-[#57411f] px-2 py-1 text-[11px] font-medium text-[#f5b14e]">
+                    <span className="inline-flex rounded-full bg-[rgba(16,185,129,0.12)] px-2.5 py-1 text-[11px] font-medium text-[#10b981]">
                       {payment.status}
                     </span>
                   </td>
                   <td className="py-4">
                     <div className="flex justify-end">
                       <button
-                        className="inline-flex items-center gap-1 text-[#d7deea] transition hover:text-white"
+                        className="inline-flex items-center gap-1 text-[var(--app-text-muted)] transition hover:text-[#2563eb]"
                         onClick={() => setDetailsPayment(payment)}
                         type="button"
                       >
@@ -495,7 +495,7 @@ export function SupplierPaymentsPage() {
                 </label>
 
                 <label className="block space-y-2">
-                  <span className="text-[14px] font-medium text-[#d6ddea]">Previous Due Amount ($) *</span>
+                  <span className="text-[14px] font-medium text-[#d6ddea]">Previous Due Amount (৳) *</span>
                   <input
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
                     name="previousDueAmount"
@@ -508,7 +508,7 @@ export function SupplierPaymentsPage() {
                 </label>
 
                 <label className="block space-y-2">
-                  <span className="text-[14px] font-medium text-[#d6ddea]">Paid Amount ($) *</span>
+                  <span className="text-[14px] font-medium text-[#d6ddea]">Paid Amount (৳) *</span>
                   <input
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
                     name="paidAmount"

@@ -7,8 +7,8 @@ const initialMaterials = [
     category: "Raw Metal",
     currentStock: "450 kg",
     minStock: "500 kg",
-    unitCost: "$12",
-    totalValue: "$5,400",
+    unitCost: "৳12",
+    totalValue: "৳5,400",
     status: "Low Stock",
   },
   {
@@ -17,8 +17,8 @@ const initialMaterials = [
     category: "Raw Metal",
     currentStock: "800 kg",
     minStock: "300 kg",
-    unitCost: "$18",
-    totalValue: "$14,400",
+    unitCost: "৳18",
+    totalValue: "৳14,400",
     status: "Normal",
   },
   {
@@ -27,8 +27,8 @@ const initialMaterials = [
     category: "Electrical",
     currentStock: "200 meters",
     minStock: "150 meters",
-    unitCost: "$25",
-    totalValue: "$5,000",
+    unitCost: "৳25",
+    totalValue: "৳5,000",
     status: "Normal",
   },
 ];
@@ -147,7 +147,10 @@ export function RawMaterialStockPage() {
 
   const totalItems = materials.length;
   const lowStockCount = materials.filter((material) => material.status === "Low Stock").length;
-  const stockValue = materials.reduce((total, material) => total + Number(material.totalValue.replace(/[$,]/g, "")), 0);
+  const stockValue = materials.reduce((total, material) => {
+    const numericValue = Number(material.totalValue.replace(/[^\d.-]/g, ""));
+    return total + numericValue;
+  }, 0);
 
   function handleExport() {
     const header = ["ID", "Material", "Category", "Current Stock", "Min Stock", "Unit Cost", "Total Value", "Status"];
@@ -209,8 +212,8 @@ export function RawMaterialStockPage() {
         category: formValues.category,
         currentStock: `${currentStockNumber} ${formValues.unit}`,
         minStock: `${minimumStockNumber} ${formValues.unit}`,
-        unitCost: `$${unitCostNumber}`,
-        totalValue: `$${totalValueNumber.toLocaleString("en-US")}`,
+        unitCost: `৳${unitCostNumber}`,
+        totalValue: `৳${totalValueNumber.toLocaleString("en-US")}`,
         status: currentStockNumber < minimumStockNumber ? "Low Stock" : "Normal",
       },
     ]);
@@ -247,51 +250,51 @@ export function RawMaterialStockPage() {
       </div>
 
       <section className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-        <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
+        <article className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
           <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#4b4129] text-[#f7a614]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[rgba(37,99,235,0.12)] text-[#2563eb]">
               <StockCardIcon type="items" />
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">Total Items</div>
-              <div className="mt-1 text-[34px] font-semibold leading-none text-white">{totalItems}</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--app-text-soft)]">Total Items</div>
+              <div className="mt-1 text-[34px] font-semibold leading-none text-[var(--app-text)]">{totalItems}</div>
             </div>
           </div>
         </article>
 
-        <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
+        <article className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
           <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#4d3340] text-[#ef4444]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[rgba(239,68,68,0.12)] text-[#ef4444]">
               <StockCardIcon type="low-stock" />
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">Low Stock</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--app-text-soft)]">Low Stock</div>
               <div className="mt-1 text-[34px] font-semibold leading-none text-[#ef4444]">{lowStockCount}</div>
             </div>
           </div>
         </article>
 
-        <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
+        <article className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
           <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#4b4129] text-[#f7a614]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[rgba(37,99,235,0.12)] text-[#2563eb]">
               <StockCardIcon type="value" />
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">Stock Value</div>
-              <div className="mt-1 text-[34px] font-semibold leading-none text-[#f7a614]">
-                ${stockValue.toLocaleString("en-US")}
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--app-text-soft)]">Stock Value</div>
+              <div className="mt-1 text-[34px] font-semibold leading-none text-[#2563eb]">
+                ৳{stockValue.toLocaleString("en-US")}
               </div>
             </div>
           </div>
         </article>
       </section>
 
-      <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
+      <article className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_140px_40px_140px]">
-          <label className="flex h-11 items-center gap-3 rounded-md border border-[#334156] bg-[#243045] px-4 text-[#77879d]">
+          <label className="flex h-11 items-center gap-3 rounded-md border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-4 text-[var(--app-text-soft)]">
             <SearchIcon />
             <input
-              className="w-full bg-transparent text-[14px] text-[#d6ddea] outline-none placeholder:text-[#77879d]"
+              className="w-full bg-transparent text-[14px] text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search Material..."
               type="text"
@@ -300,7 +303,7 @@ export function RawMaterialStockPage() {
           </label>
 
           <button
-            className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]"
+            className="flex h-11 items-center justify-between rounded-md border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-4 text-[12px] text-[var(--app-text)]"
             onClick={() => setDateFrom("23-04-2024")}
             type="button"
           >
@@ -308,10 +311,10 @@ export function RawMaterialStockPage() {
             <ChevronRightIcon />
           </button>
 
-          <div className="flex items-center justify-center text-[12px] text-[#9aa6bb]">to</div>
+          <div className="flex items-center justify-center text-[12px] text-[var(--app-text-muted)]">to</div>
 
           <button
-            className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]"
+            className="flex h-11 items-center justify-between rounded-md border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-4 text-[12px] text-[var(--app-text)]"
             onClick={() => setDateTo("23-04-2024")}
             type="button"
           >
@@ -323,7 +326,7 @@ export function RawMaterialStockPage() {
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
             <thead>
-              <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
+              <tr className="border-b border-[var(--app-border)] text-[10px] uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                 <th className="w-[90px] pb-3 font-medium">ID</th>
                 <th className="w-[18%] pb-3 font-medium">Material</th>
                 <th className="w-[16%] pb-3 font-medium">Category</th>
@@ -336,25 +339,27 @@ export function RawMaterialStockPage() {
             </thead>
             <tbody>
               {filteredMaterials.map((material) => (
-                <tr
+                  <tr
                   className={[
-                    "border-b border-[#2d394d] text-[13px] text-[#d7deea]",
-                    material.status === "Low Stock" ? "bg-[#3a313f]/45" : "",
+                    "border-b border-[var(--app-border)] text-[13px] text-[var(--app-text)]",
+                    material.status === "Low Stock" ? "bg-[rgba(239,68,68,0.08)]" : "",
                   ].join(" ")}
                   key={material.id}
                 >
-                  <td className="py-4 font-semibold text-[#f7a614]">{material.id}</td>
+                  <td className="py-4 font-semibold text-[#2563eb]">{material.id}</td>
                   <td className="py-4 pr-3">{material.material}</td>
                   <td className="py-4 pr-3">{material.category}</td>
                   <td className="py-4">{material.currentStock}</td>
                   <td className="py-4">{material.minStock}</td>
                   <td className="py-4">{material.unitCost}</td>
-                  <td className="py-4 font-semibold text-[#f7a614]">{material.totalValue}</td>
+                  <td className="py-4 font-semibold text-[#2563eb]">{material.totalValue}</td>
                   <td className="py-4">
                     <span
                       className={[
-                        "inline-flex rounded-sm px-2 py-1 text-[11px] font-medium",
-                        material.status === "Low Stock" ? "bg-[#5b2f35] text-[#ff6b6b]" : "bg-[#57411f] text-[#f5b14e]",
+                        "inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium",
+                        material.status === "Low Stock"
+                          ? "bg-[rgba(239,68,68,0.12)] text-[#dc2626]"
+                          : "bg-[rgba(16,185,129,0.12)] text-[#10b981]",
                       ].join(" ")}
                     >
                       {material.status}
@@ -438,7 +443,7 @@ export function RawMaterialStockPage() {
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-[15px] text-[#d7deea]">Unit Cost ($)</span>
+                  <span className="mb-2 block text-[15px] text-[#d7deea]">Unit Cost (৳)</span>
                   <input
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#d6ddea] outline-none"
                     name="unitCost"

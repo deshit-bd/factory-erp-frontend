@@ -20,7 +20,7 @@
     min-width: 320px;
     background: linear-gradient(180deg, #131d2e 0%, #111a29 100%);
     color: var(--color-ink-950);
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    font-family: Inter, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   }
 
   a {
@@ -31,5 +31,262 @@
   button,
   input {
     font: inherit;
+  }
+}
+
+@layer base {
+  :root {
+    --app-bg: linear-gradient(180deg, #131d2e 0%, #111a29 100%);
+    --app-surface: #222d40;
+    --app-surface-soft: #202b3d;
+    --app-surface-strong: #1e2737;
+    --app-sidebar: #1f2940;
+    --app-panel: #263248;
+    --app-border: #314058;
+    --app-border-soft: #344056;
+    --app-text: #e6ebf4;
+    --app-text-muted: #8f9cb0;
+    --app-text-soft: #7f8ea6;
+    --app-overlay: rgba(13, 20, 34, 0.72);
+  }
+
+  :root[data-theme="light"] {
+    --app-bg: linear-gradient(180deg, #f5f7fa 0%, #eef3f8 100%);
+    --app-surface: #ffffff;
+    --app-surface-soft: #f5f7fa;
+    --app-surface-strong: #ffffff;
+    --app-sidebar: #ffffff;
+    --app-panel: #ffffff;
+    --app-border: #e2e8f0;
+    --app-border-soft: #e2e8f0;
+    --app-text: #0f172a;
+    --app-text-muted: #647488;
+    --app-text-soft: #647488;
+    --app-overlay: rgba(148, 163, 184, 0.18);
+    --app-primary: #2563eb;
+    --app-primary-hover: #1d4ed8;
+    --app-secondary: #10b981;
+    --app-secondary-soft: #ecfdf5;
+    --app-accent-soft: #eff6ff;
+    --app-radius: 12px;
+  }
+
+  body {
+    background: var(--app-bg);
+  }
+
+  :root[data-theme="light"] header,
+  :root[data-theme="light"] aside,
+  :root[data-theme="light"] article,
+  :root[data-theme="light"] section.rounded-\[5px\],
+  :root[data-theme="light"] section.rounded-md,
+  :root[data-theme="light"] div.rounded-md,
+  :root[data-theme="light"] div.rounded-\[6px\],
+  :root[data-theme="light"] div.rounded-\[5px\],
+  :root[data-theme="light"] div.rounded-\[4px\] {
+    border-color: var(--app-border) !important;
+  }
+
+  :root[data-theme="light"] header {
+    background: var(--app-surface-strong) !important;
+    color: var(--app-text) !important;
+  }
+
+  :root[data-theme="light"] .rounded-sm,
+  :root[data-theme="light"] .rounded-md,
+  :root[data-theme="light"] .rounded-lg,
+  :root[data-theme="light"] .rounded-\[2px\],
+  :root[data-theme="light"] .rounded-\[3px\],
+  :root[data-theme="light"] .rounded-\[4px\],
+  :root[data-theme="light"] .rounded-\[5px\],
+  :root[data-theme="light"] .rounded-\[6px\] {
+    border-radius: var(--app-radius) !important;
+  }
+
+  :root[data-theme="light"] aside {
+    background: var(--app-sidebar) !important;
+    color: var(--app-text) !important;
+  }
+
+  :root[data-theme="light"] aside nav a {
+    color: var(--app-text-muted) !important;
+    background: transparent !important;
+  }
+
+  :root[data-theme="light"] aside nav a:hover {
+    background: var(--app-accent-soft) !important;
+    color: var(--app-primary) !important;
+  }
+
+  :root[data-theme="light"] aside nav a.bg-\[\#f5a30f\] {
+    background: var(--app-primary) !important;
+    color: #ffffff !important;
+  }
+
+  :root[data-theme="light"] aside nav a.bg-\[\#f5a30f\] span {
+    color: inherit !important;
+  }
+
+  :root[data-theme="light"] aside .text-\[\#f6a623\] {
+    color: var(--app-primary) !important;
+  }
+
+  :root[data-theme="light"] aside .text-white\/65,
+  :root[data-theme="light"] aside .text-white\/88 {
+    color: var(--app-text-muted) !important;
+  }
+
+  :root[data-theme="light"] aside .bg-\[\#f6a623\]\/15,
+  :root[data-theme="light"] aside .bg-\[\#f6a623\]\/20 {
+    background: var(--app-accent-soft) !important;
+  }
+
+  :root[data-theme="light"] aside button {
+    color: var(--app-text-muted) !important;
+  }
+
+  :root[data-theme="light"] aside button.bg-\[\#263248\] {
+    background: var(--app-surface) !important;
+    border-color: var(--app-border) !important;
+  }
+
+  :root[data-theme="light"] main,
+  :root[data-theme="light"] section,
+  :root[data-theme="light"] article,
+  :root[data-theme="light"] div[class*="bg-[#222d40]"],
+  :root[data-theme="light"] div[class*="bg-[#202b3f]"],
+  :root[data-theme="light"] div[class*="bg-[#202b3d]"],
+  :root[data-theme="light"] div[class*="bg-[#243045]"],
+  :root[data-theme="light"] div[class*="bg-[#263248]"],
+  :root[data-theme="light"] div[class*="bg-[#2a3548]"],
+  :root[data-theme="light"] div[class*="bg-[#1b2435]"] {
+    color: var(--app-text);
+  }
+
+  :root[data-theme="light"] .bg-\[\#222d40\],
+  :root[data-theme="light"] .bg-\[\#202b3f\],
+  :root[data-theme="light"] .bg-\[\#202b3d\],
+  :root[data-theme="light"] .bg-\[\#243045\],
+  :root[data-theme="light"] .bg-\[\#263248\],
+  :root[data-theme="light"] .bg-\[\#2a3548\],
+  :root[data-theme="light"] .bg-\[\#1e2737\],
+  :root[data-theme="light"] .bg-\[\#1f2940\],
+  :root[data-theme="light"] .bg-\[\#1b2435\],
+  :root[data-theme="light"] .bg-\[\#161f31\] {
+    background: var(--app-surface) !important;
+    color: var(--app-text) !important;
+  }
+
+  :root[data-theme="light"] .bg-\[\#202b3f\],
+  :root[data-theme="light"] .bg-\[\#243045\],
+  :root[data-theme="light"] .bg-\[\#263248\],
+  :root[data-theme="light"] .bg-\[\#2a3548\],
+  :root[data-theme="light"] .bg-\[\#202b3d\] {
+    background: var(--app-surface-soft) !important;
+  }
+
+  :root[data-theme="light"] .border-\[\#314058\],
+  :root[data-theme="light"] .border-\[\#334156\],
+  :root[data-theme="light"] .border-\[\#334156\],
+  :root[data-theme="light"] .border-\[\#344056\],
+  :root[data-theme="light"] .border-\[\#2d384c\],
+  :root[data-theme="light"] .border-\[\#2a3346\],
+  :root[data-theme="light"] .border-\[\#2d394d\] {
+    border-color: var(--app-border) !important;
+  }
+
+  :root[data-theme="light"] .text-white,
+  :root[data-theme="light"] .text-\[\#e6ebf4\],
+  :root[data-theme="light"] .text-\[\#d7deea\],
+  :root[data-theme="light"] .text-\[\#d6ddea\],
+  :root[data-theme="light"] .text-\[\#c5cfdd\] {
+    color: var(--app-text) !important;
+  }
+
+  :root[data-theme="light"] .text-\[\#8f9cb0\],
+  :root[data-theme="light"] .text-\[\#93a0b4\],
+  :root[data-theme="light"] .text-\[\#98a5bb\],
+  :root[data-theme="light"] .text-\[\#9aa6bb\],
+  :root[data-theme="light"] .text-\[\#7f8ea6\],
+  :root[data-theme="light"] .text-\[\#77879d\],
+  :root[data-theme="light"] .text-\[\#8d9ab0\],
+  :root[data-theme="light"] .text-\[\#8e9aad\] {
+    color: var(--app-text-muted) !important;
+  }
+
+  :root[data-theme="light"] input,
+  :root[data-theme="light"] textarea,
+  :root[data-theme="light"] select {
+    background: var(--app-surface-soft) !important;
+    color: var(--app-text) !important;
+    border-color: var(--app-border-soft) !important;
+  }
+
+  :root[data-theme="light"] input::placeholder,
+  :root[data-theme="light"] textarea::placeholder {
+    color: var(--app-text-soft) !important;
+  }
+
+  :root[data-theme="light"] .bg-\[\#f6a313\],
+  :root[data-theme="light"] .bg-\[\#f5a30f\] {
+    background: var(--app-primary) !important;
+    color: #ffffff !important;
+  }
+
+  :root[data-theme="light"] .hover\:bg-\[\#ffb733\]:hover,
+  :root[data-theme="light"] .hover\:bg-\[\#ffb327\]:hover {
+    background: var(--app-primary-hover) !important;
+  }
+
+  :root[data-theme="light"] .border-\[\#f6a313\],
+  :root[data-theme="light"] .border-\[\#f5a30f\] {
+    border-color: var(--app-primary) !important;
+  }
+
+  :root[data-theme="light"] .text-\[\#f7a614\],
+  :root[data-theme="light"] .text-\[\#f6a623\],
+  :root[data-theme="light"] .text-\[\#f5a30f\],
+  :root[data-theme="light"] .text-\[\#ffb01a\] {
+    color: var(--app-primary) !important;
+  }
+
+  :root[data-theme="light"] .bg-\[\#57411f\],
+  :root[data-theme="light"] .bg-\[\#5e4c20\],
+  :root[data-theme="light"] .bg-\[\#6b4b28\],
+  :root[data-theme="light"] .bg-\[\#5b3b21\] {
+    background: var(--app-secondary-soft) !important;
+  }
+
+  :root[data-theme="light"] .text-\[\#f5b14e\],
+  :root[data-theme="light"] .text-\[\#f7c25f\],
+  :root[data-theme="light"] .text-\[\#ffcf75\],
+  :root[data-theme="light"] .text-\[\#f5a14e\] {
+    color: var(--app-secondary) !important;
+  }
+
+  :root[data-theme="light"] .bg-\[\#1d3b63\] {
+    background: var(--app-accent-soft) !important;
+  }
+
+  :root[data-theme="light"] .text-\[\#69a7ff\] {
+    color: var(--app-primary) !important;
+  }
+
+  :root[data-theme="light"] .shadow-\[0_30px_80px_rgba\(0\,0\,0\,0\.45\)\],
+  :root[data-theme="light"] .shadow-\[0_30px_80px_rgba\(0\,0\,0\,0\.5\)\],
+  :root[data-theme="light"] .shadow-\[0_20px_60px_rgba\(0\,0\,0\,0\.35\)\] {
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08) !important;
+  }
+
+  :root[data-theme="light"] .fixed.inset-0 {
+    background: var(--app-overlay) !important;
+  }
+
+  :root[data-theme="light"] table thead tr {
+    border-color: var(--app-border) !important;
+  }
+
+  :root[data-theme="light"] table tbody tr {
+    border-color: #e5ebf3 !important;
   }
 }

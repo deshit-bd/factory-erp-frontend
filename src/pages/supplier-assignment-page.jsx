@@ -7,8 +7,8 @@ const initialAssignments = [
     material: "Steel Rods",
     supplier: "Metal Suppliers Inc",
     quantity: "500",
-    perUnitPrice: "$12.00",
-    totalCost: "$6000.00",
+    perUnitPrice: "৳12.00",
+    totalCost: "৳6000.00",
     status: "In Progress",
   },
 ];
@@ -76,8 +76,8 @@ export function SupplierAssignmentPage() {
         material: formValues.material,
         supplier: formValues.supplier,
         quantity: String(quantity),
-        perUnitPrice: `$${perUnitPrice.toFixed(2)}`,
-        totalCost: `$${totalCost.toFixed(2)}`,
+        perUnitPrice: `৳${perUnitPrice.toFixed(2)}`,
+        totalCost: `৳${totalCost.toFixed(2)}`,
         status: "In Progress",
       },
     ]);
@@ -166,7 +166,7 @@ export function SupplierAssignmentPage() {
               </label>
 
               <label className="block space-y-2">
-                <span className="text-[14px] font-medium text-[#d6ddea]">Material *</span>
+                <span className="text-[14px] font-medium text-[#d6ddea]">Product *</span>
                 <input
                   className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
                   name="material"
@@ -202,7 +202,7 @@ export function SupplierAssignmentPage() {
               </label>
 
               <label className="block space-y-2">
-                <span className="text-[14px] font-medium text-[#d6ddea]">Per Unit Price ($) *</span>
+                <span className="text-[14px] font-medium text-[#d6ddea]">Per Unit Price (৳) *</span>
                 <input
                   className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
                   name="perUnitPrice"

@@ -7,8 +7,8 @@ const initialOrders = [
     buyer: "ABC Corp",
     product: "Industrial Valves",
     quantity: "500",
-    unitPrice: "$120",
-    total: "$60,000",
+    unitPrice: "৳120",
+    total: "৳60,000",
     status: "Confirmed",
   },
   {
@@ -17,11 +17,13 @@ const initialOrders = [
     buyer: "XYZ Ltd",
     product: "Steel Pipes",
     quantity: "300",
-    unitPrice: "$85",
-    total: "$25,500",
+    unitPrice: "৳85",
+    total: "৳25,500",
     status: "Completed",
   },
 ];
+
+const demoBuyers = ["ABC Corp", "XYZ Ltd", "Global Textiles", "Northern Garments", "Prime Exports"];
 
 function SearchIcon() {
   return (
@@ -59,6 +61,14 @@ function ChevronRightIcon() {
   return (
     <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
       <path d="M10 6l6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
     </svg>
   );
 }
@@ -181,8 +191,8 @@ export function SalesOrdersPage() {
         buyer: formValues.buyer,
         product: formValues.product,
         quantity: String(quantity),
-        unitPrice: `$${unitPrice}`,
-        total: `$${total.toLocaleString("en-US")}`,
+        unitPrice: `৳${unitPrice}`,
+        total: `৳${total.toLocaleString("en-US")}`,
         status: "Confirmed",
       },
     ]);
@@ -325,14 +335,27 @@ export function SalesOrdersPage() {
             <form className="space-y-4 px-4 py-4" onSubmit={handleCreateOrder}>
               <label className="block">
                 <span className="mb-2 block text-[14px] text-[#d7deea]">Buyer *</span>
-                <input
-                  className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#d6ddea] outline-none placeholder:text-[#77879d]"
-                  name="buyer"
-                  onChange={handleFormChange}
-                  required
-                  type="text"
-                  value={formValues.buyer}
-                />
+                <div className="relative">
+                  <select
+                    className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 pr-11 text-[14px] text-[#d6ddea] outline-none"
+                    name="buyer"
+                    onChange={handleFormChange}
+                    required
+                    value={formValues.buyer}
+                  >
+                    <option disabled value="">
+                      Select buyer
+                    </option>
+                    {demoBuyers.map((buyer) => (
+                      <option key={buyer} value={buyer}>
+                        {buyer}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[#97a5bc]">
+                    <ChevronDownIcon />
+                  </span>
+                </div>
               </label>
 
               <label className="block">
@@ -380,9 +403,8 @@ export function SalesOrdersPage() {
                   className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#d6ddea] outline-none placeholder:text-[#77879d]"
                   name="date"
                   onChange={handleFormChange}
-                  placeholder="DD/MM/YY"
                   required
-                  type="text"
+                  type="date"
                   value={formValues.date}
                 />
               </label>

@@ -6,11 +6,13 @@ const initialPurchases = [
     material: "Steel Rods",
     supplier: "Metal Suppliers Inc",
     quantity: "500",
-    unitCost: "$12",
-    total: "$6,000",
+    unitCost: "৳12",
+    total: "৳6,000",
     date: "2026-04-15",
   },
 ];
+
+const demoSuppliers = ["Metal Suppliers Inc", "Industrial Materials Co", "Prime Alloys Ltd", "Delta Chemicals", "Northern Steel Works"];
 
 function SearchIcon() {
   return (
@@ -48,6 +50,14 @@ function ChevronRightIcon() {
   return (
     <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
       <path d="M10 6l6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
     </svg>
   );
 }
@@ -154,8 +164,8 @@ export function MaterialPurchasePage() {
         material: formValues.material,
         supplier: formValues.supplier,
         quantity: String(quantity),
-        unitCost: `$${unitCost}`,
-        total: `$${total.toLocaleString("en-US")}`,
+        unitCost: `৳${unitCost}`,
+        total: `৳${total.toLocaleString("en-US")}`,
         date: formValues.date,
       },
     ]);
@@ -287,14 +297,27 @@ export function MaterialPurchasePage() {
 
                 <label className="block space-y-2 md:col-span-3">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Supplier *</span>
-                  <input
-                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
-                    name="supplier"
-                    onChange={handleFormChange}
-                    required
-                    type="text"
-                    value={formValues.supplier}
-                  />
+                  <div className="relative">
+                    <select
+                      className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 pr-11 text-[14px] text-[#e6ebf4] outline-none"
+                      name="supplier"
+                      onChange={handleFormChange}
+                      required
+                      value={formValues.supplier}
+                    >
+                      <option disabled value="">
+                        Select supplier
+                      </option>
+                      {demoSuppliers.map((supplier) => (
+                        <option key={supplier} value={supplier}>
+                          {supplier}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[#97a5bc]">
+                      <ChevronDownIcon />
+                    </span>
+                  </div>
                 </label>
 
                 <label className="block space-y-2 md:col-span-2">
@@ -310,7 +333,7 @@ export function MaterialPurchasePage() {
                 </label>
 
                 <label className="block space-y-2 md:col-span-2">
-                  <span className="text-[14px] font-medium text-[#d6ddea]">Unit Cost ($) *</span>
+                  <span className="text-[14px] font-medium text-[#d6ddea]">Unit Cost (৳) *</span>
                   <input
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
                     name="unitCost"

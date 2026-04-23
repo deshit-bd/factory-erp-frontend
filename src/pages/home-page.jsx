@@ -10,6 +10,7 @@ import { InvoicesPage } from "@/pages/invoices-page";
 import { MaterialAllocationPage } from "@/pages/material-allocation-page";
 import { MaterialPurchasePage } from "@/pages/material-purchase-page";
 import { ProjectsPage } from "@/pages/projects-page";
+import { RawMaterialSupplierPage } from "@/pages/raw-material-supplier-page";
 import { RawMaterialStockPage } from "@/pages/raw-material-stock-page";
 import { SalesOrdersPage } from "@/pages/sales-orders-page";
 import { SettingsPage } from "@/pages/settings-page";
@@ -50,7 +51,11 @@ export function HomePage() {
           return <FactoryProductTrackingPage />;
         }
 
-        if (selectedItem === "Suppliers") {
+        if (selectedItem === "Raw Material Supplier") {
+          return <RawMaterialSupplierPage />;
+        }
+
+        if (selectedItem === "Project Goods Supplier") {
           return <SuppliersPage />;
         }
 

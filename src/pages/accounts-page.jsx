@@ -3,10 +3,10 @@ import { useState } from "react";
 const accountTabs = ["Dashboard", "Project Wise", "Factory Costs", "Exports Costs", "Monthly Bills", "Office Costs"];
 
 const summaryCards = [
-  { key: "receivables", label: "Total Receivables", value: "$0", tone: "amber", icon: "receivables" },
-  { key: "payables", label: "Total Payables", value: "$0", tone: "red", icon: "payables" },
-  { key: "cash", label: "Cash/Bank Balance", value: "$27,000", tone: "amber", icon: "cash" },
-  { key: "profit", label: "Net Profit/Loss", value: "+$27,000", tone: "amber", icon: "profit" },
+  { key: "receivables", label: "Total Receivables", value: "৳0", tone: "amber", icon: "receivables" },
+  { key: "payables", label: "Total Payables", value: "৳0", tone: "red", icon: "payables" },
+  { key: "cash", label: "Cash/Bank Balance", value: "৳27,000", tone: "amber", icon: "cash" },
+  { key: "profit", label: "Net Profit/Loss", value: "+৳27,000", tone: "amber", icon: "profit" },
 ];
 
 const debitRows = [
@@ -22,10 +22,9 @@ const creditRows = [
 ];
 
 const projectWiseCostCards = [
-  { key: "material", label: "Material Cost", value: "$0" },
-  { key: "suppliers", label: "Suppliers Cost", value: "$0" },
-  { key: "factory", label: "Factory Cost", value: "$27,000" },
-  { key: "total", label: "Total Cost", value: "$27,000" },
+  { key: "material", label: "Material Cost", value: "৳0" },
+  { key: "suppliers", label: "Suppliers Cost", value: "৳0" },
+  { key: "total", label: "Total Cost", value: "৳27,000" },
 ];
 
 const projectWiseCostRows = [
@@ -34,7 +33,7 @@ const projectWiseCostRows = [
     name: "Industrial Valves Order",
     buyerName: "ABC crop",
     materialCost: "50000.00",
-    factoryCost: "30000.00",
+    supplierCost: "30000.00",
     exportCost: "20000.00",
     totalCost: "400000",
   },
@@ -43,16 +42,16 @@ const projectWiseCostRows = [
     name: "Steel Pipes Manufacturing",
     buyerName: "XYZ.comp",
     materialCost: "70000.00",
-    factoryCost: "40000.00",
+    supplierCost: "40000.00",
     exportCost: "30000.00",
     totalCost: "400000",
   },
 ];
 
 const projectWiseProfitCards = [
-  { key: "budget", label: "Total Budget", value: "$0" },
-  { key: "cost", label: "Total Cost", value: "$0" },
-  { key: "profit", label: "Total Profit", value: "$27,000" },
+  { key: "budget", label: "Total Budget", value: "৳0" },
+  { key: "cost", label: "Total Cost", value: "৳0" },
+  { key: "profit", label: "Total Profit", value: "৳27,000" },
 ];
 
 const projectWiseProfitRows = [
@@ -75,8 +74,8 @@ const projectWiseProfitRows = [
 ];
 
 const factoryCostRows = {
-  "Daily Costs": [{ id: "FC-001", category: "Electricity", amount: "$450", date: "2026-04-17", recipe: "-" }],
-  "Monthly Costs": [{ id: "FC-002", category: "Rent", amount: "$15,000", date: "2026-04-01", recipe: "-" }],
+  "Daily Costs": [{ id: "FC-001", category: "Electricity", amount: "৳450", date: "2026-04-17", recipe: "-" }],
+  "Monthly Costs": [{ id: "FC-002", category: "Rent", amount: "৳15,000", date: "2026-04-01", recipe: "-" }],
 };
 
 const initialExportCosts = [
@@ -85,7 +84,7 @@ const initialExportCosts = [
     project: "PRJ-001",
     destination: "USA",
     date: "2026-04-15",
-    totalCost: "$1,850",
+    totalCost: "৳1,850",
     items: [
       { category: "Shipping", amount: 1200, description: "Ocean freight" },
       { category: "Customs", amount: 350, description: "Import clearance" },
@@ -100,7 +99,7 @@ const initialMonthlyBills = [
     vendor: "Electric Company",
     category: "Utilities",
     expenseFor: "Factory",
-    amount: "$2,500",
+    amount: "৳2,500",
     dueDate: "2026-04-25",
     status: "Pending",
     receipt: null,
@@ -110,7 +109,7 @@ const initialMonthlyBills = [
     vendor: "Internet Provider",
     category: "Services",
     expenseFor: "Office",
-    amount: "$150",
+    amount: "৳150",
     dueDate: "2026-04-20",
     status: "Paid",
     receipt: null,
@@ -122,7 +121,7 @@ const initialOfficeCosts = [
     id: "OFC-001",
     category: "Travel",
     description: "Client meeting in NY",
-    amount: "$350",
+    amount: "৳350",
     date: "2026-04-15",
     receipt: "-",
   },
@@ -130,7 +129,7 @@ const initialOfficeCosts = [
     id: "OFC-002",
     category: "Supplies",
     description: "Office supplies",
-    amount: "$125",
+    amount: "৳125",
     date: "2026-04-14",
     receipt: "-",
   },
@@ -362,6 +361,25 @@ function DashboardPanel() {
 
 function ProjectWisePanel() {
   const [activeProjectTab, setActiveProjectTab] = useState("Project Wise cost");
+  const [costSearch, setCostSearch] = useState("");
+
+  const filteredProjectWiseCostRows = projectWiseCostRows.filter((row) => {
+    const query = costSearch.toLowerCase().trim();
+
+    if (!query) {
+      return true;
+    }
+
+    return (
+      row.projectId.toLowerCase().includes(query) ||
+      row.name.toLowerCase().includes(query) ||
+      row.buyerName.toLowerCase().includes(query) ||
+      row.materialCost.toLowerCase().includes(query) ||
+      row.supplierCost.toLowerCase().includes(query) ||
+      row.exportCost.toLowerCase().includes(query) ||
+      row.totalCost.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <div className="space-y-5">
@@ -383,7 +401,7 @@ function ProjectWisePanel() {
 
       {activeProjectTab === "Project Wise cost" ? (
         <>
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_2.3fr]">
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {projectWiseCostCards.map((card) => (
               <article
                 className="rounded-[4px] border border-[#344059] bg-[#202b3f] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
@@ -400,10 +418,16 @@ function ProjectWisePanel() {
           <section className="rounded-[5px] border border-[#344059] bg-[#202b3f] px-4 py-4">
             <div className="text-[13px] font-semibold text-[#d7deea]">Project Wise Cost</div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-[4px] border border-[#344059] bg-[#202b3f] px-3 py-3 text-[#8b96ab]">
+            <label className="mt-4 flex items-center gap-3 rounded-[4px] border border-[#344059] bg-[#202b3f] px-3 py-3 text-[#8b96ab]">
               <SearchIcon />
-              <span className="text-[12px]">Search...</span>
-            </div>
+              <input
+                className="w-full bg-transparent text-[12px] text-[#d7deea] outline-none placeholder:text-[#8b96ab]"
+                onChange={(event) => setCostSearch(event.target.value)}
+                placeholder="Search..."
+                type="text"
+                value={costSearch}
+              />
+            </label>
 
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
@@ -413,19 +437,19 @@ function ProjectWisePanel() {
                     <th className="pb-3 font-medium">Name</th>
                     <th className="pb-3 font-medium">Buyer Name</th>
                     <th className="pb-3 font-medium">Material Cost</th>
-                    <th className="pb-3 font-medium">Factory Cost</th>
+                    <th className="pb-3 font-medium">Supplier Cost</th>
                     <th className="pb-3 font-medium">Export Cost</th>
                     <th className="pb-3 text-right font-medium">Total Cost</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {projectWiseCostRows.map((row) => (
+                  {filteredProjectWiseCostRows.map((row) => (
                     <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]" key={row.projectId}>
                       <td className="py-4 font-semibold text-[#f5a30f]">{row.projectId}</td>
                       <td className="py-4">{row.name}</td>
                       <td className="py-4">{row.buyerName}</td>
                       <td className="py-4 font-semibold text-[#f1f5f9]">{row.materialCost}</td>
-                      <td className="py-4 font-mono text-[#e5e7eb]">{row.factoryCost}</td>
+                      <td className="py-4 font-mono text-[#e5e7eb]">{row.supplierCost}</td>
                       <td className="py-4 font-mono text-[#e5e7eb]">{row.exportCost}</td>
                       <td className="py-4 text-right font-semibold text-[#f5a30f]">{row.totalCost}</td>
                     </tr>
@@ -498,7 +522,7 @@ function FactoryCostsPanel() {
   const [activeCostTab, setActiveCostTab] = useState("Daily Costs");
   const rows = factoryCostRows[activeCostTab];
   const totalLabel = activeCostTab === "Daily Costs" ? "Total Daily Costs" : "Total Monthly Costs";
-  const totalValue = activeCostTab === "Daily Costs" ? "$450" : "$15,000";
+  const totalValue = activeCostTab === "Daily Costs" ? "৳450" : "৳15,000";
 
   return (
     <div className="space-y-5">
@@ -625,7 +649,7 @@ function ExportCostsPanel() {
   });
   const [draftItems, setDraftItems] = useState([]);
 
-  const totalExportCosts = exportCosts.reduce((sum, item) => sum + Number(item.totalCost.replace(/[$,]/g, "")), 0);
+  const totalExportCosts = exportCosts.reduce((sum, item) => sum + Number(item.totalCost.replace(/[^\d.-]/g, "")), 0);
 
   function handleExport() {
     const header = ["ID", "Project", "Destination", "Date", "Total Cost"];
@@ -719,7 +743,7 @@ function ExportCostsPanel() {
         project: formValues.project,
         destination: formValues.destination,
         date: formValues.date,
-        totalCost: `$${total.toLocaleString("en-US")}`,
+        totalCost: `৳${total.toLocaleString("en-US")}`,
         items: itemsToSave,
       },
     ]);
@@ -758,7 +782,7 @@ function ExportCostsPanel() {
       <section className="rounded-[5px] border border-[#80561a] bg-[#2f2a28] px-5 py-5">
         <div className="flex items-center justify-between gap-4">
           <div className="text-[11px] uppercase tracking-[0.18em] text-[#98a3b8]">Total Export Costs</div>
-          <div className="text-[30px] font-semibold text-[#ffb01a]">${totalExportCosts.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div className="text-[30px] font-semibold text-[#ffb01a]">৳{totalExportCosts.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         </div>
       </section>
 
@@ -825,7 +849,7 @@ function ExportCostsPanel() {
                 <div className="mb-3 text-[13px] font-semibold text-[#d7deea]">Cost Items</div>
                 <div className="space-y-4">
                   <Field label="Category *" name="category" onChange={handleFormChange} placeholder="" value={formValues.category} />
-                  <Field label="Amount ($) *" name="amount" onChange={handleFormChange} placeholder="0.00" type="number" value={formValues.amount} />
+                  <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} placeholder="0.00" type="number" value={formValues.amount} />
                   <Field
                     label="Description"
                     name="description"
@@ -850,7 +874,7 @@ function ExportCostsPanel() {
                   {draftItems.map((item, index) => (
                     <div className="flex items-center justify-between text-[12px] text-[#d7deea]" key={`${item.category}-${index}`}>
                       <span>{item.category}</span>
-                      <span>${item.amount.toLocaleString("en-US")}</span>
+                      <span>৳{item.amount.toLocaleString("en-US")}</span>
                     </div>
                   ))}
                 </div>
@@ -889,7 +913,7 @@ function ExportCostsPanel() {
                 <div className="rounded-[4px] border border-[#344059] bg-[#1b2435] p-3" key={`${item.category}-${index}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-[13px] font-medium text-[#e6ebf4]">{item.category}</div>
-                    <div className="text-[13px] font-semibold text-[#f5a30f]">${item.amount.toLocaleString("en-US")}</div>
+                    <div className="text-[13px] font-semibold text-[#f5a30f]">৳{item.amount.toLocaleString("en-US")}</div>
                   </div>
                   <div className="mt-1 text-[12px] text-[#8e9aad]">{item.description}</div>
                 </div>
@@ -968,7 +992,7 @@ function MonthlyBillsPanel() {
         vendor: formValues.vendor,
         category: formValues.category,
         expenseFor: formValues.expenseFor,
-        amount: `$${Number(formValues.amount || 0).toLocaleString("en-US")}`,
+        amount: `৳${Number(formValues.amount || 0).toLocaleString("en-US")}`,
         dueDate: formValues.dueDate,
         status: "Pending",
         receipt: formValues.receipt || null,
@@ -1093,7 +1117,7 @@ function MonthlyBillsPanel() {
                 value={formValues.category}
               />
               <Field label="Expense For *" name="expenseFor" onChange={handleFormChange} placeholder="" value={formValues.expenseFor} />
-              <Field label="Amount ($) *" name="amount" onChange={handleFormChange} placeholder="" type="number" value={formValues.amount} />
+              <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} placeholder="" type="number" value={formValues.amount} />
               <Field label="Due Date *" name="dueDate" onChange={handleFormChange} placeholder="" value={formValues.dueDate} />
               <ReceiptUpload fileName={formValues.receipt} onSelect={(fileName) => setFormValues((current) => ({ ...current, receipt: fileName }))} />
 
@@ -1124,7 +1148,7 @@ function OfficeCostsPanel() {
     receipt: "",
   });
 
-  const totalOfficeCosts = officeCosts.reduce((sum, item) => sum + Number(item.amount.replace(/[$,]/g, "")), 0);
+  const totalOfficeCosts = officeCosts.reduce((sum, item) => sum + Number(item.amount.replace(/[^\d.-]/g, "")), 0);
 
   function handleExport() {
     const header = ["Expense ID", "Category", "Description", "Amount", "Date", "Receipt"];
@@ -1170,7 +1194,7 @@ function OfficeCostsPanel() {
         id: `OFC-${padded}`,
         category: formValues.category,
         description: formValues.description,
-        amount: `$${Number(formValues.amount || 0).toLocaleString("en-US")}`,
+        amount: `৳${Number(formValues.amount || 0).toLocaleString("en-US")}`,
         date: formValues.date,
         receipt: formValues.receipt || "-",
       },
@@ -1210,7 +1234,7 @@ function OfficeCostsPanel() {
       <section className="rounded-[5px] border border-[#80561a] bg-[#2f2a28] px-5 py-5">
         <div className="flex items-center justify-between gap-4">
           <div className="text-[11px] uppercase tracking-[0.18em] text-[#98a3b8]">Total Expenses (Current Month)</div>
-          <div className="text-[30px] font-semibold text-[#ffb01a]">${totalOfficeCosts.toLocaleString("en-US")}</div>
+          <div className="text-[30px] font-semibold text-[#ffb01a]">৳{totalOfficeCosts.toLocaleString("en-US")}</div>
         </div>
       </section>
 
@@ -1256,7 +1280,7 @@ function OfficeCostsPanel() {
             <form className="space-y-4 px-4 py-4" onSubmit={handleSubmit}>
               <Field label="Category *" name="category" onChange={handleFormChange} placeholder="" value={formValues.category} />
               <Field label="Description *" name="description" onChange={handleFormChange} placeholder="" value={formValues.description} />
-              <Field label="Amount ($) *" name="amount" onChange={handleFormChange} placeholder="" type="number" value={formValues.amount} />
+              <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} placeholder="" type="number" value={formValues.amount} />
               <Field label="Date" name="date" onChange={handleFormChange} placeholder="" value={formValues.date} />
               <ReceiptUpload fileName={formValues.receipt} onSelect={(fileName) => setFormValues((current) => ({ ...current, receipt: fileName }))} />
 

@@ -1,10 +1,10 @@
 const summaryCards = [
-  { icon: "pulse", value: "3", label: "Total Projects", change: "+12%", accent: "text-amber-400" },
-  { icon: "dollar", value: "$2.4M", label: "Total Revenue", change: "+8%", accent: "text-amber-400" },
-  { icon: "clock", value: "0", label: "Pending Orders", change: "-3%", accent: "text-orange-400" },
-  { icon: "alert", value: "1", label: "Low Stock Items", change: "+2", accent: "text-red-400" },
-  { icon: "trend", value: "2", label: "Total Suppliers", change: "+5%", accent: "text-amber-400" },
-  { icon: "cube", value: "$24.8K", label: "Inventory Value", change: "-8%", accent: "text-slate-400" },
+  { icon: "pulse", value: "3", label: "Total Projects", change: "+12%", tone: "amber" },
+  { icon: "dollar", value: "৳2.4M", label: "Total Revenue", change: "+8%", tone: "amber" },
+  { icon: "clock", value: "0", label: "Pending Orders", change: "-3%", tone: "amber" },
+  { icon: "alert", value: "1", label: "Low Stock Items", change: "+2", tone: "red" },
+  { icon: "trend", value: "2", label: "Total Suppliers", change: "+5%", tone: "amber" },
+  { icon: "cube", value: "৳24.8K", label: "Inventory Value", change: "-8%", tone: "slate" },
 ];
 
 const chartPoints = [
@@ -18,8 +18,8 @@ const chartPoints = [
 
 const projects = [
   { id: "PRJ-001", name: "Industrial Valves Order", buyer: "ABC Corp", status: "In Progress", statusTone: "blue", progress: 65 },
-  { id: "PRJ-002", name: "Steel Pipes Manufacturing", buyer: "XYZ Ltd", status: "Completed", statusTone: "amber", progress: 100 },
-  { id: "PRJ-003", name: "Custom Fittings", buyer: "DEF Inc", status: "Pending", statusTone: "orange", progress: 20 },
+  { id: "PRJ-002", name: "Steel Pipes Manufacturing", buyer: "XYZ Ltd", status: "Completed", statusTone: "green", progress: 100 },
+  { id: "PRJ-003", name: "Custom Fittings", buyer: "DEF Inc", status: "Pending", statusTone: "amber", progress: 20 },
 ];
 
 const alerts = [
@@ -92,34 +92,71 @@ function CardIcon({ type, className }) {
   }
 }
 
+function cardToneClasses(tone) {
+  if (tone === "red") {
+    return {
+      icon: "text-[#ef4444]",
+      badge: "text-[#94a3b8]",
+    };
+  }
+
+  if (tone === "slate") {
+    return {
+      icon: "text-[#94a3b8]",
+      badge: "text-[#94a3b8]",
+    };
+  }
+
+  return {
+    icon: "text-[#f59e0b]",
+    badge: "text-[#94a3b8]",
+  };
+}
+
+function statusClasses(tone) {
+  if (tone === "green") {
+    return "bg-[rgba(16,185,129,0.12)] text-[#22c55e]";
+  }
+
+  if (tone === "amber") {
+    return "bg-[rgba(245,158,11,0.14)] text-[#f59e0b]";
+  }
+
+  return "bg-[rgba(37,99,235,0.12)] text-[#3b82f6]";
+}
+
 export function DashboardPage() {
   const chartPath = chartPoints.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
 
   return (
     <div className="w-full min-w-0 space-y-4">
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        {summaryCards.map((card) => (
-          <article
-            className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
-            key={card.label}
-          >
-            <div className="flex items-start justify-between">
-              <CardIcon className={["h-4 w-4", card.accent].join(" ")} type={card.icon} />
-              <span className="text-[10px] font-medium text-[#7f8ea6]">{card.change}</span>
-            </div>
-            <div className="mt-4 text-[31px] font-semibold leading-none text-white">{card.value}</div>
-            <div className="mt-2 text-[10px] uppercase tracking-[0.16em] text-[#7e8ba1]">{card.label}</div>
-          </article>
-        ))}
+        {summaryCards.map((card) => {
+          const tone = cardToneClasses(card.tone);
+
+          return (
+            <article
+              className="min-h-[116px] rounded-[14px] border border-[#d9e3f0] bg-[var(--app-surface)] px-4 py-3.5 shadow-[0_8px_24px_rgba(37,99,235,0.05)]"
+              key={card.label}
+            >
+              <div className="flex items-start justify-between">
+                <CardIcon className={["h-[13px] w-[13px]", tone.icon].join(" ")} type={card.icon} />
+                <span className={["text-[10px] font-medium tracking-tight", tone.badge].join(" ")}>{card.change}</span>
+              </div>
+              <div className="mt-5 text-[31px] font-semibold leading-none tracking-[-0.03em] text-[#0f172a]">{card.value}</div>
+              <div className="mt-3 text-[11px] uppercase tracking-[0.18em] text-[#7a8ca8]">{card.label}</div>
+            </article>
+          );
+        })}
       </section>
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_1fr]">
-        <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
-          <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7f8ea6]">
+        <article className="rounded-[14px] border border-[#d9e3f0] bg-[var(--app-surface)] px-4 py-4 shadow-[0_8px_24px_rgba(37,99,235,0.05)]">
+          <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6f84a3]">
             Sales Trend (6 months)
           </div>
           <svg className="h-[190px] w-full" viewBox="0 0 470 190">
-            <g stroke="#334155" strokeDasharray="3 5" strokeWidth="1">
+            <g stroke="#9fb2cc" strokeDasharray="3 5" strokeWidth="1">
               <path d="M40 20H440" />
               <path d="M40 55H440" />
               <path d="M40 90H440" />
@@ -133,7 +170,7 @@ export function DashboardPage() {
               <path d="M440 20V160" />
             </g>
 
-            <g fill="#7f8ea6" fontSize="11">
+            <g fill="#8ea3c1" fontSize="11">
               <text x="6" y="163">0</text>
               <text x="0" y="128">20000</text>
               <text x="0" y="93">40000</text>
@@ -141,7 +178,7 @@ export function DashboardPage() {
               <text x="0" y="23">80000</text>
             </g>
 
-            <g fill="#7f8ea6" fontSize="11">
+            <g fill="#8ea3c1" fontSize="11">
               {chartPoints.map((point) => (
                 <text key={point.month} x={point.x - 7} y="177">
                   {point.month}
@@ -149,44 +186,46 @@ export function DashboardPage() {
               ))}
             </g>
 
-            <path d={chartPath} fill="none" stroke="#f7a614" strokeWidth="2.5" />
+            <path d={chartPath} fill="none" stroke="#f59e0b" strokeWidth="2.35" />
             {chartPoints.map((point) => (
-              <circle cx={point.x} cy={point.y} fill="#f7a614" key={point.month} r="3.5" />
+              <circle cx={point.x} cy={point.y} fill="#f59e0b" key={point.month} r="3.25" />
             ))}
           </svg>
         </article>
 
-        <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
-          <div className="mb-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7f8ea6]">
+        <article className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+          <div className="mb-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-soft)]">
             Production Distribution
           </div>
-          <div className="grid h-[190px] grid-cols-[1fr_auto_1fr] items-center gap-4">
-            <div className="space-y-16 text-right">
+          <div className="grid h-[190px] grid-cols-1 items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
+            <div className="space-y-5 text-left sm:space-y-16 sm:text-right">
               <div className="text-[12px] text-[#fb923c]">In Progress: 25%</div>
               <div className="text-[12px] text-[#d97706]">Pending: 22%</div>
             </div>
 
-            <div className="relative h-32 w-32 rounded-full bg-[conic-gradient(#f6a313_0_35%,#64748b_35%_53%,#d97706_53%_75%,#fb923c_75%_100%)]">
-              <div className="absolute inset-[18px] rounded-full bg-[#222d40]" />
+            <div className="relative mx-auto h-32 w-32 rounded-full bg-[conic-gradient(#f59e0b_0_35%,#64748b_35%_53%,#d97706_53%_75%,#fb923c_75%_100%)]">
+              <div
+                className="absolute inset-[18px] rounded-full border border-[var(--app-border)] bg-[var(--app-surface)]"
+              />
             </div>
 
-            <div className="space-y-16 text-left">
-              <div className="text-[12px] text-[#f6a313]">Completed: 35%</div>
-              <div className="text-[12px] text-[#66758d]">On Hold: 18%</div>
+            <div className="space-y-5 text-left sm:space-y-16">
+              <div className="text-[12px] text-[#f59e0b]">Completed: 35%</div>
+              <div className="text-[12px] text-[#64748b]">On Hold: 18%</div>
             </div>
           </div>
         </article>
       </section>
 
-      <section className="grid w-full min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)]">
-        <article className="w-full min-w-0 rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
-          <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7f8ea6]">
+      <section className="grid w-full min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
+        <article className="w-full min-w-0 rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+          <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--app-text-soft)]">
             Recent Projects
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[620px] table-fixed border-collapse text-left">
               <thead>
-                <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.12em] text-[#7f8ea6]">
+                <tr className="border-b border-[var(--app-border)] text-[10px] uppercase tracking-[0.12em] text-[var(--app-text-soft)]">
                   <th className="w-[100px] pb-3 font-medium">Project ID</th>
                   <th className="w-[36%] pb-3 font-medium">Name</th>
                   <th className="w-[110px] pb-3 font-medium">Buyer</th>
@@ -196,30 +235,21 @@ export function DashboardPage() {
               </thead>
               <tbody>
                 {projects.map((project) => (
-                  <tr className="border-b border-[#2d394d] text-[12px] text-[#d2d9e6]" key={project.id}>
-                    <td className="py-3 font-semibold text-[#f7a614]">{project.id}</td>
+                  <tr className="border-b border-[var(--app-border)] text-[12px] text-[var(--app-text)]" key={project.id}>
+                    <td className="py-3 font-semibold text-[var(--app-primary)]">{project.id}</td>
                     <td className="py-3 pr-4">{project.name}</td>
-                    <td className="py-3 pr-3 text-[#9aa6bb]">{project.buyer}</td>
+                    <td className="py-3 pr-3 text-[var(--app-text-muted)]">{project.buyer}</td>
                     <td className="py-3">
-                      <span
-                        className={[
-                          "inline-flex rounded-sm px-2 py-1 text-[10px] font-medium",
-                          project.statusTone === "blue" && "bg-[#1d3b63] text-[#69a7ff]",
-                          project.statusTone === "amber" && "bg-[#57411f] text-[#f5b14e]",
-                          project.statusTone === "orange" && "bg-[#5b3b21] text-[#f5a14e]",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                      >
+                      <span className={["inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium", statusClasses(project.statusTone)].join(" ")}>
                         {project.status}
                       </span>
                     </td>
                     <td className="py-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-1.5 w-12 rounded-full bg-[#3a465b]">
-                          <div className="h-1.5 rounded-full bg-[#f7a614]" style={{ width: `${project.progress}%` }} />
+                        <div className="h-1.5 w-14 rounded-full bg-[#dbeafe]">
+                          <div className="h-1.5 rounded-full bg-[#2563eb]" style={{ width: `${project.progress}%` }} />
                         </div>
-                        <span className="text-[11px] text-[#7f8ea6]">{project.progress}%</span>
+                        <span className="text-[11px] text-[#64748b]">{project.progress}%</span>
                       </div>
                     </td>
                   </tr>
@@ -229,15 +259,18 @@ export function DashboardPage() {
           </div>
         </article>
 
-        <article className="w-full min-w-0 rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
-          <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7f8ea6]">
+        <article className="w-full min-w-0 rounded-[14px] border border-[#d9e3f0] bg-[var(--app-surface)] px-4 py-4 shadow-[0_8px_24px_rgba(37,99,235,0.05)]">
+          <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6f84a3]">
             System Alerts
           </div>
           <div className="space-y-3">
             {alerts.map((alert) => (
-              <div className="min-h-[92px] rounded-md border border-[#6b4b28] bg-[#2b3345] px-4 py-3" key={alert.title}>
-                <div className="text-[13px] leading-7 text-[#d7deea]">{alert.title}</div>
-                <div className="mt-2 text-[11px] text-[#7f8ea6]">{alert.time}</div>
+              <div
+                className="min-h-[92px] rounded-[14px] border border-[#3e4961] bg-[#3b465f] px-4 py-4 text-white shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+                key={alert.title}
+              >
+                <div className="text-[13px] leading-7 text-white/92">{alert.title}</div>
+                <div className="mt-4 text-[11px] text-[#a2b0c6]">{alert.time}</div>
               </div>
             ))}
           </div>

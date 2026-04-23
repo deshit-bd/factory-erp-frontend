@@ -34,7 +34,42 @@ function MenuIcon() {
   );
 }
 
-export function AppTopbar({ title = "Dashboard", sidebarWidth = 220, sidebarCollapsed = false, onOpenMobileSidebar }) {
+function ThemeIcon({ theme }) {
+  if (theme === "light") {
+    return (
+      <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+        <path
+          d="M12 3v2.5M12 18.5V21M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M3 12h2.5M18.5 12H21M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77M12 16a4 4 0 100-8 4 4 0 000 8z"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path
+        d="M20 15.5A8.5 8.5 0 1111.5 4 6.5 6.5 0 0020 15.5z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+export function AppTopbar({
+  title = "Dashboard",
+  sidebarWidth = 220,
+  sidebarCollapsed = false,
+  onOpenMobileSidebar,
+  onToggleTheme,
+  theme = "dark",
+}) {
   return (
     <header className="border-b border-[#2d384c] bg-[#1e2737] text-white">
       <div
@@ -71,8 +106,10 @@ export function AppTopbar({ title = "Dashboard", sidebarWidth = 220, sidebarColl
             >
               <MenuIcon />
             </button>
-            <h1 className="truncate text-[18px] font-semibold text-white">{title}</h1>
-            <p className="mt-0.5 hidden text-[12px] text-[#93a0b4] sm:block">Sunday, April 19, 2026</p>
+            <div className="flex min-w-0 flex-col">
+              <h1 className="truncate text-[18px] font-semibold text-white">{title}</h1>
+              <p className="mt-0.5 text-[12px] text-[#93a0b4]">Sunday, April 19, 2026</p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -84,6 +121,15 @@ export function AppTopbar({ title = "Dashboard", sidebarWidth = 220, sidebarColl
                 type="text"
               />
             </label>
+
+            <button
+              aria-label="Toggle theme"
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-[#344056] bg-[#202b3d] text-[#c5cfdd] transition hover:text-white"
+              onClick={onToggleTheme}
+              type="button"
+            >
+              <ThemeIcon theme={theme} />
+            </button>
 
             <button
               aria-label="Notifications"

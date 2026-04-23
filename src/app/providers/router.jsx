@@ -13,6 +13,7 @@ import { MaterialAllocationPage } from "@/pages/material-allocation-page";
 import { MaterialPurchasePage } from "@/pages/material-purchase-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { ProjectsPage } from "@/pages/projects-page";
+import { RawMaterialSupplierPage } from "@/pages/raw-material-supplier-page";
 import { RawMaterialStockPage } from "@/pages/raw-material-stock-page";
 import { SalesOrdersPage } from "@/pages/sales-orders-page";
 import { SettingsPage } from "@/pages/settings-page";
@@ -57,6 +58,10 @@ export const router = createBrowserRouter([
       {
         path: "factory-product-tracking",
         element: <FactoryProductTrackingPage />,
+      },
+      {
+        path: "raw-material-supplier",
+        element: <RawMaterialSupplierPage />,
       },
       {
         path: "suppliers",

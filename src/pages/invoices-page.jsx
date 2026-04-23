@@ -5,9 +5,9 @@ const initialInvoices = [
     id: "INV-001",
     buyer: "ABC Corp",
     project: "PRJ-001",
-    amount: "$60,000",
-    paid: "$30,000",
-    due: "$30,000",
+    amount: "৳60,000",
+    paid: "৳30,000",
+    due: "৳30,000",
     date: "2026-04-10",
     status: "Partial",
   },
@@ -15,9 +15,9 @@ const initialInvoices = [
     id: "INV-002",
     buyer: "XYZ Ltd",
     project: "PRJ-002",
-    amount: "$25,500",
-    paid: "$25,500",
-    due: "$0",
+    amount: "৳25,500",
+    paid: "৳25,500",
+    due: "৳0",
     date: "2026-04-08",
     status: "Paid",
   },
@@ -181,9 +181,9 @@ export function InvoicesPage() {
       id: `INV-${padded}`,
       buyer: formValues.buyer,
       project: formValues.project,
-      amount: `$${amount.toLocaleString("en-US")}`,
-      paid: `$${paid.toLocaleString("en-US")}`,
-      due: `$${due.toLocaleString("en-US")}`,
+      amount: `৳${amount.toLocaleString("en-US")}`,
+      paid: `৳${paid.toLocaleString("en-US")}`,
+      due: `৳${due.toLocaleString("en-US")}`,
       date: formValues.date,
       status: due > 0 ? "Partial" : "Paid",
     };
@@ -284,8 +284,8 @@ export function InvoicesPage() {
             <form className="space-y-4 px-4 py-4" onSubmit={handleCreateInvoice}>
               <Field label="Buyer *" name="buyer" onChange={handleFormChange} value={formValues.buyer} />
               <Field label="Project *" name="project" onChange={handleFormChange} value={formValues.project} />
-              <Field label="Amount ($) *" name="amount" onChange={handleFormChange} type="number" value={formValues.amount} />
-              <Field label="Paid ($)" name="paid" onChange={handleFormChange} type="number" value={formValues.paid} />
+              <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} type="number" value={formValues.amount} />
+              <Field label="Paid (৳)" name="paid" onChange={handleFormChange} type="number" value={formValues.paid} />
               <Field label="Date *" name="date" onChange={handleFormChange} placeholder="YYYY-MM-DD" value={formValues.date} />
 
               <div className="flex justify-end gap-3 border-t border-[#314058] pt-4">
@@ -394,7 +394,7 @@ export function InvoicesPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Tax (0%):</span>
-                      <span>$0.00</span>
+                      <span>৳0.00</span>
                     </div>
                     <div className="mt-2 border-t border-[#334155] pt-2" />
                     <div className="flex items-center justify-between font-semibold">

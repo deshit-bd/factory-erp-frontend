@@ -2,19 +2,19 @@ import { useState } from "react";
 
 const initialSuppliers = [
   {
-    id: "SUP-001",
+    id: "RMS-001",
     name: "Metal Suppliers Inc",
-    category: "Raw Materials",
+    category: "Steel Sheets",
     email: "contact@metalsup.com",
     phone: "+1-555-0100",
     rating: "4.5",
     paymentTerms: "Net 30",
-    receipt: "Supplier Profile.pdf",
+    receipt: "Raw Material Profile.pdf",
   },
   {
-    id: "SUP-002",
+    id: "RMS-002",
     name: "Industrial Materials Co",
-    category: "Raw Materials",
+    category: "Chemical Resin",
     email: "sales@indmat.com",
     phone: "+1-555-0101",
     rating: "4.2",
@@ -107,7 +107,7 @@ function StarIcon() {
   );
 }
 
-export function SuppliersPage() {
+export function RawMaterialSupplierPage() {
   const [suppliers, setSuppliers] = useState(initialSuppliers);
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("23-04-2024");
@@ -149,7 +149,7 @@ export function SuppliersPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "suppliers.csv";
+    link.download = "raw-material-suppliers.csv";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -218,7 +218,7 @@ export function SuppliersPage() {
       setSuppliers((current) => [
         ...current,
         {
-          id: `SUP-${padded}`,
+          id: `RMS-${padded}`,
           name: formValues.name,
           category: formValues.category,
           email: formValues.email,
@@ -245,8 +245,8 @@ export function SuppliersPage() {
     <section className="w-full min-w-0 space-y-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-[34px] font-semibold leading-none text-[#e6ebf4]">Project Goods Supplier</h2>
-          <p className="mt-3 text-[15px] text-[#8f9cb0]">Manage supplier relationships</p>
+          <h2 className="text-[34px] font-semibold leading-none text-[#e6ebf4]">Raw Material Supplier</h2>
+          <p className="mt-3 text-[15px] text-[#8f9cb0]">Manage raw material supplier relationships</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -276,7 +276,7 @@ export function SuppliersPage() {
             <input
               className="w-full bg-transparent text-[14px] text-[#d6ddea] outline-none placeholder:text-[#77879d]"
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search Suppliers..."
+              placeholder="Search Raw Material Suppliers..."
               type="text"
               value={search}
             />

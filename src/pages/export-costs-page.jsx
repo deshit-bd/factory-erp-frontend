@@ -6,7 +6,7 @@ const initialExportCosts = [
     project: "PRJ-001",
     destination: "USA",
     date: "2026-04-15",
-    totalCost: "$1,850",
+    totalCost: "৳1,850",
     items: [
       { category: "Shipping", amount: 1200, description: "Ocean freight" },
       { category: "Customs", amount: 350, description: "Import clearance" },
@@ -70,7 +70,7 @@ export function ExportCostsPage() {
   });
   const [draftItems, setDraftItems] = useState([]);
 
-  const totalExportCosts = exportCosts.reduce((sum, item) => sum + Number(item.totalCost.replace(/[$,]/g, "")), 0);
+  const totalExportCosts = exportCosts.reduce((sum, item) => sum + Number(item.totalCost.replace(/[^\d.-]/g, "")), 0);
 
   function handleExport() {
     const header = ["ID", "Project", "Destination", "Date", "Total Cost"];
@@ -164,7 +164,7 @@ export function ExportCostsPage() {
         project: formValues.project,
         destination: formValues.destination,
         date: formValues.date,
-        totalCost: `$${total.toLocaleString("en-US")}`,
+        totalCost: `৳${total.toLocaleString("en-US")}`,
         items: itemsToSave,
       },
     ]);
@@ -205,7 +205,7 @@ export function ExportCostsPage() {
       <article className="rounded-md border border-[#6a4d1a] bg-[#2f2b2a] px-5 py-5">
         <div className="flex items-center justify-between gap-4">
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9cb0]">Total Export Costs</div>
-          <div className="text-[36px] font-semibold leading-none text-[#f7a614]">${totalExportCosts.toLocaleString("en-US")}</div>
+          <div className="text-[36px] font-semibold leading-none text-[#f7a614]">৳{totalExportCosts.toLocaleString("en-US")}</div>
         </div>
       </article>
 
@@ -311,7 +311,7 @@ export function ExportCostsPage() {
               </label>
 
               <label className="block space-y-2">
-                <span className="text-[14px] font-medium text-[#d6ddea]">Amount ($) *</span>
+                <span className="text-[14px] font-medium text-[#d6ddea]">Amount (৳) *</span>
                 <input
                   className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
                   name="amount"
@@ -350,7 +350,7 @@ export function ExportCostsPage() {
                     {draftItems.map((item, index) => (
                       <div className="flex items-center justify-between text-[13px] text-[#d7deea]" key={`${item.category}-${index}`}>
                         <span>{item.category}</span>
-                        <span className="font-semibold text-[#f7a614]">${item.amount.toLocaleString("en-US")}</span>
+                        <span className="font-semibold text-[#f7a614]">৳{item.amount.toLocaleString("en-US")}</span>
                       </div>
                     ))}
                   </div>
@@ -410,7 +410,7 @@ export function ExportCostsPage() {
                     <div className="rounded-md bg-[#243045] px-3 py-3" key={`${item.category}-${index}`}>
                       <div className="flex items-center justify-between">
                         <div className="font-medium text-[#e6ebf4]">{item.category}</div>
-                        <div className="font-semibold text-[#f7a614]">${item.amount.toLocaleString("en-US")}</div>
+                        <div className="font-semibold text-[#f7a614]">৳{item.amount.toLocaleString("en-US")}</div>
                       </div>
                       {item.description ? <div className="mt-1 text-[13px] text-[#8f9cb0]">{item.description}</div> : null}
                     </div>
