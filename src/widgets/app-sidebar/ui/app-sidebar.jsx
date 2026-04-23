@@ -1,23 +1,6 @@
-const items = [
-  { label: "Dashboard", icon: "grid" },
-  { label: "Buyer Management", icon: "users" },
-  { label: "Sales Orders", icon: "cart" },
-  { label: "Projects", icon: "folder" },
-  { label: "Raw Material Stock", icon: "cube" },
-  { label: "Material Purchase", icon: "box" },
-  { label: "Material Allocation", icon: "branch" },
-  { label: "Factory Product Tracking", icon: "spark" },
-  { label: "Suppliers", icon: "briefcase" },
-  { label: "Supplier Assignment", icon: "link" },
-  { label: "Supplier Products Tracking", icon: "package" },
-  { label: "Finished Goods", icon: "gift" },
-  { label: "Delivery/Shipment", icon: "truck" },
-  { label: "Delivery History", icon: "history" },
-  { label: "Supplier Payments", icon: "wallet" },
-  { label: "Invoices", icon: "file" },
-  { label: "Accounts", icon: "ledger" },
-  { label: "Settings", icon: "gear" },
-];
+import { NavLink } from "react-router-dom";
+
+import { sidebarItems } from "@/shared/config/sidebar-navigation";
 
 function Icon({ type }) {
   const baseProps = {
@@ -228,7 +211,7 @@ function ChevronLeftIcon({ collapsed }) {
   );
 }
 
-export function AppSidebar({ selectedItem = "Dashboard", onSelectItem, collapsed = false, onToggleCollapsed }) {
+export function AppSidebar({ collapsed = false, onToggleCollapsed }) {
   return (
     <aside
       className="relative hidden min-h-[calc(100vh-74px)] border-r border-[#2a3346] bg-[#1f2940] text-white transition-[width] duration-200 md:block"
@@ -245,36 +228,34 @@ export function AppSidebar({ selectedItem = "Dashboard", onSelectItem, collapsed
 
       <div className={["flex h-full flex-col overflow-y-auto py-3", collapsed ? "px-1.5" : "px-3"].join(" ")}>
         <nav aria-label="Sidebar navigation" className="flex flex-col gap-[2px]">
-          {items.map((item) => (
-            <label
-              className={[
-                "flex min-h-[28px] cursor-pointer items-center rounded-[2px] text-left text-[11px] leading-none transition",
-                collapsed ? "justify-center px-0" : "gap-2 px-3",
-                selectedItem === item.label
-                  ? "bg-[#f5a30f] font-semibold text-[#172136]"
-                  : "text-white/88 hover:bg-white/6",
-              ].join(" ")}
-              title={item.label}
+          {sidebarItems.map((item) => (
+            <NavLink
+              className={({ isActive }) =>
+                [
+                  "flex min-h-[28px] items-center rounded-[2px] text-left text-[11px] leading-none transition",
+                  collapsed ? "justify-center px-0" : "gap-2 px-3",
+                  isActive ? "bg-[#f5a30f] font-semibold text-[#172136]" : "text-white/88 hover:bg-white/6",
+                ].join(" ")
+              }
+              end={item.path === "/"}
               key={item.label}
+              title={item.label}
+              to={item.path}
             >
-              <input
-                checked={selectedItem === item.label}
-                className="sr-only"
-                name="sidebar-navigation"
-                onChange={() => onSelectItem?.(item.label)}
-                type="radio"
-                value={item.label}
-              />
-              <span className={selectedItem === item.label ? "text-[#172136]" : "text-white/88"}>
-                <Icon type={item.icon} />
-              </span>
-              {!collapsed ? <span className="truncate">{item.label}</span> : null}
-              {!collapsed && item.badge ? (
-                <span className="ml-auto flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#f5a30f] text-[8px] font-bold text-[#172136]">
-                  {item.badge}
-                </span>
-              ) : null}
-            </label>
+              {({ isActive }) => (
+                <>
+                  <span className={isActive ? "text-[#172136]" : "text-white/88"}>
+                    <Icon type={item.icon} />
+                  </span>
+                  {!collapsed ? <span className="truncate">{item.label}</span> : null}
+                  {!collapsed && item.badge ? (
+                    <span className="ml-auto flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#f5a30f] text-[8px] font-bold text-[#172136]">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                </>
+              )}
+            </NavLink>
           ))}
         </nav>
       </div>
