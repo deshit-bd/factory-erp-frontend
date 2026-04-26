@@ -1,27 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialSuppliers = [
-  {
-    id: "RMS-001",
-    name: "Metal Suppliers Inc",
-    category: "Steel Sheets",
-    email: "contact@metalsup.com",
-    phone: "+1-555-0100",
-    rating: "4.5",
-    paymentTerms: "Net 30",
-    receipt: "Raw Material Profile.pdf",
-  },
-  {
-    id: "RMS-002",
-    name: "Industrial Materials Co",
-    category: "Chemical Resin",
-    email: "sales@indmat.com",
-    phone: "+1-555-0101",
-    rating: "4.2",
-    paymentTerms: "Net 45",
-    receipt: "Registration.pdf",
-  },
-];
+import {
+  createRawMaterialSupplier,
+  deleteRawMaterialSupplier,
+  getRawMaterialSuppliers,
+  updateRawMaterialSupplier,
+} from "@/shared/lib/raw-material-supplier-api";
 
 function SearchIcon() {
   return (
@@ -107,11 +91,40 @@ function StarIcon() {
   );
 }
 
+function formatSupplierDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).split("T")[0];
+}
+
+function isWithinDateRange(value, dateFrom, dateTo) {
+  const normalizedValue = formatSupplierDate(value);
+
+  if (!normalizedValue) {
+    return false;
+  }
+
+  if (dateFrom && normalizedValue < dateFrom) {
+    return false;
+  }
+
+  if (dateTo && normalizedValue > dateTo) {
+    return false;
+  }
+
+  return true;
+}
+
 export function RawMaterialSupplierPage() {
-  const [suppliers, setSuppliers] = useState(initialSuppliers);
+  const [suppliers, setSuppliers] = useState([]);
+  const [suppliersLoading, setSuppliersLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState("");
-  const [dateFrom, setDateFrom] = useState("23-04-2024");
-  const [dateTo, setDateTo] = useState("23-04-2024");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formValues, setFormValues] = useState({
@@ -121,28 +134,55 @@ export function RawMaterialSupplierPage() {
     phone: "",
   });
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSuppliers() {
+      try {
+        const records = await getRawMaterialSuppliers();
+
+        if (isMounted) {
+          setSuppliers(records);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setSuppliersLoading(false);
+        }
+      }
+    }
+
+    loadSuppliers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const filteredSuppliers = suppliers.filter((supplier) => {
     const query = search.toLowerCase();
-    return (
+    const matchesSearch =
       supplier.id.toLowerCase().includes(query) ||
       supplier.name.toLowerCase().includes(query) ||
       supplier.category.toLowerCase().includes(query) ||
       supplier.email.toLowerCase().includes(query) ||
-      supplier.phone.toLowerCase().includes(query)
-    );
+      supplier.phone.toLowerCase().includes(query);
+
+    return matchesSearch && isWithinDateRange(supplier.createdAt, dateFrom, dateTo);
   });
 
   function handleExport() {
-    const header = ["ID", "Name", "Category", "Email", "Phone", "Rating", "Payment Terms", "Receipt"];
-    const rows = suppliers.map((supplier) => [
+    const header = ["ID", "Name", "Category", "Email", "Phone", "Rating"];
+    const rows = filteredSuppliers.map((supplier) => [
       supplier.id,
       supplier.name,
       supplier.category,
       supplier.email,
       supplier.phone,
       supplier.rating,
-      supplier.paymentTerms,
-      supplier.receipt,
     ]);
     const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -155,6 +195,7 @@ export function RawMaterialSupplierPage() {
   }
 
   function openAddSupplierModal() {
+    setErrorMessage("");
     setEditingId(null);
     setFormValues({
       name: "",
@@ -166,7 +207,8 @@ export function RawMaterialSupplierPage() {
   }
 
   function openEditSupplierModal(supplier) {
-    setEditingId(supplier.id);
+    setErrorMessage("");
+    setEditingId(supplier.recordId);
     setFormValues({
       name: supplier.name,
       category: supplier.category,
@@ -195,50 +237,36 @@ export function RawMaterialSupplierPage() {
     }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage("");
 
-    if (editingId) {
-      setSuppliers((current) =>
-        current.map((supplier) =>
-          supplier.id === editingId
-            ? {
-                ...supplier,
-                name: formValues.name,
-                category: formValues.category,
-                email: formValues.email,
-                phone: formValues.phone,
-              }
-            : supplier,
-        ),
-      );
-    } else {
-      const nextNumber = suppliers.length + 1;
-      const padded = String(nextNumber).padStart(3, "0");
-      setSuppliers((current) => [
-        ...current,
-        {
-          id: `RMS-${padded}`,
-          name: formValues.name,
-          category: formValues.category,
-          email: formValues.email,
-          phone: formValues.phone,
-          rating: "4.0",
-          paymentTerms: "Net 30",
-          receipt: "No receipt",
-        },
-      ]);
+    try {
+      if (editingId) {
+        const updatedSupplier = await updateRawMaterialSupplier(editingId, formValues);
+        setSuppliers((current) => current.map((supplier) => (supplier.recordId === editingId ? updatedSupplier : supplier)));
+      } else {
+        const newSupplier = await createRawMaterialSupplier(formValues);
+        setSuppliers((current) => [...current, newSupplier]);
+      }
+
+      closeAddSupplierModal();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    closeAddSupplierModal();
   }
 
-  function handleDeleteSupplier(id) {
-    setSuppliers((current) => current.filter((supplier) => supplier.id !== id));
-  }
-
-  function handleViewReceipt(receipt) {
-    window.alert(receipt === "No receipt" ? "No receipt uploaded for this supplier." : `Receipt: ${receipt}`);
+  async function handleDeleteSupplier(recordId) {
+    try {
+      setErrorMessage("");
+      await deleteRawMaterialSupplier(recordId);
+      setSuppliers((current) => current.filter((supplier) => supplier.recordId !== recordId));
+    } catch (error) {
+      setErrorMessage(error.message);
+    }
   }
 
   return (
@@ -269,6 +297,8 @@ export function RawMaterialSupplierPage() {
         </div>
       </div>
 
+      {errorMessage ? <div className="rounded-md border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[14px] text-[#f7c8cf]">{errorMessage}</div> : null}
+
       <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_140px_40px_140px]">
           <label className="flex h-11 items-center gap-3 rounded-md border border-[#334156] bg-[#243045] px-4 text-[#77879d]">
@@ -282,82 +312,84 @@ export function RawMaterialSupplierPage() {
             />
           </label>
 
-          <button
-            className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]"
-            onClick={() => setDateFrom("23-04-2024")}
-            type="button"
-          >
-            <span>{dateFrom}</span>
-            <ChevronRightIcon />
-          </button>
+          <label className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]">
+            <input
+              className="w-full bg-transparent text-[12px] text-[#d6ddea] outline-none"
+              onChange={(event) => setDateFrom(event.target.value)}
+              type="date"
+              value={dateFrom}
+            />
+          </label>
 
           <div className="flex items-center justify-center text-[12px] text-[#9aa6bb]">to</div>
 
-          <button
-            className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]"
-            onClick={() => setDateTo("23-04-2024")}
-            type="button"
-          >
-            <span>{dateTo}</span>
-            <ChevronRightIcon />
-          </button>
+          <label className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]">
+            <input
+              className="w-full bg-transparent text-[12px] text-[#d6ddea] outline-none"
+              onChange={(event) => setDateTo(event.target.value)}
+              type="date"
+              value={dateTo}
+            />
+          </label>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
+        <div className="mt-4 overflow-x-hidden">
+          <table className="w-full table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
                 <th className="w-[68px] pb-3 font-medium">ID</th>
-                <th className="w-[18%] pb-3 font-medium">Name</th>
-                <th className="w-[12%] pb-3 font-medium">Category</th>
-                <th className="w-[17%] pb-3 font-medium">Email</th>
-                <th className="w-[12%] pb-3 font-medium">Phone</th>
+                <th className="w-[19%] pb-3 font-medium">Name</th>
+                <th className="w-[14%] pb-3 font-medium">Category</th>
+                <th className="w-[19%] pb-3 font-medium">Email</th>
+                <th className="w-[13%] pb-3 font-medium">Phone</th>
                 <th className="w-[7%] pb-3 font-medium">Rating</th>
-                <th className="w-[14%] pb-3 font-medium">Payment Terms</th>
-                <th className="w-[8%] pb-3 font-medium">Receipt</th>
-                <th className="w-[9%] pb-3 text-right font-medium">Actions</th>
+                <th className="w-[11%] pb-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredSuppliers.map((supplier) => (
-                <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={supplier.id}>
-                  <td className="py-4 font-semibold text-[#f7a614]">{supplier.id}</td>
-                  <td className="py-4 pr-3">{supplier.name}</td>
-                  <td className="py-4 pr-3">{supplier.category}</td>
-                  <td className="py-4 pr-3 text-[#98a5bb]">{supplier.email}</td>
-                  <td className="py-4 pr-3">{supplier.phone}</td>
-                  <td className="py-4">
-                    <span className="inline-flex items-center gap-1 text-[#f7a614]">
-                      <StarIcon />
-                      <span className="text-[#d7deea]">{supplier.rating}</span>
-                    </span>
-                  </td>
-                  <td className="py-4 text-[#d7deea]">{supplier.paymentTerms}</td>
-                  <td className="py-4">
-                    <button
-                      className="text-[13px] font-medium text-[#f7a614] transition hover:text-[#ffc550]"
-                      onClick={() => handleViewReceipt(supplier.receipt)}
-                      type="button"
-                    >
-                      View
-                    </button>
-                  </td>
-                  <td className="py-4">
-                    <div className="flex justify-end gap-4">
-                      <button className="text-[#d7deea] transition hover:text-white" onClick={() => openEditSupplierModal(supplier)} type="button">
-                        <EditIcon />
-                      </button>
-                      <button
-                        className="text-[#ef4444] transition hover:text-[#f87171]"
-                        onClick={() => handleDeleteSupplier(supplier.id)}
-                        type="button"
-                      >
-                        <TrashIcon />
-                      </button>
-                    </div>
+              {suppliersLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={7}>
+                    Loading raw material suppliers...
                   </td>
                 </tr>
-              ))}
+              ) : filteredSuppliers.length === 0 ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={7}>
+                    No raw material suppliers found.
+                  </td>
+                </tr>
+              ) : (
+                filteredSuppliers.map((supplier) => (
+                  <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={supplier.recordId}>
+                    <td className="py-4 font-semibold text-[#f7a614]">{supplier.id}</td>
+                    <td className="py-4 pr-3">{supplier.name}</td>
+                    <td className="py-4 pr-3">{supplier.category}</td>
+                    <td className="py-4 pr-3 text-[#98a5bb]">{supplier.email}</td>
+                    <td className="py-4 pr-3">{supplier.phone}</td>
+                    <td className="py-4">
+                      <span className="inline-flex items-center gap-1 text-[#f7a614]">
+                        <StarIcon />
+                        <span className="text-[#d7deea]">{supplier.rating}</span>
+                      </span>
+                    </td>
+                    <td className="py-4">
+                      <div className="flex justify-end gap-4">
+                        <button className="text-[#d7deea] transition hover:text-white" onClick={() => openEditSupplierModal(supplier)} type="button">
+                          <EditIcon />
+                        </button>
+                        <button
+                          className="text-[#ef4444] transition hover:text-[#f87171]"
+                          onClick={() => handleDeleteSupplier(supplier.recordId)}
+                          type="button"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -404,6 +436,7 @@ export function RawMaterialSupplierPage() {
                   className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
                   name="email"
                   onChange={handleFormChange}
+                  required
                   type="email"
                   value={formValues.email}
                 />
@@ -415,6 +448,7 @@ export function RawMaterialSupplierPage() {
                   className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
                   name="phone"
                   onChange={handleFormChange}
+                  required
                   type="text"
                   value={formValues.phone}
                 />
@@ -425,6 +459,7 @@ export function RawMaterialSupplierPage() {
                 </button>
                 <button
                   className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                  disabled={isSubmitting}
                   type="submit"
                 >
                   {editingId ? "Save Supplier" : "Add Supplier"}

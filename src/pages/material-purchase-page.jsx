@@ -1,18 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialPurchases = [
-  {
-    id: "PUR-001",
-    material: "Steel Rods",
-    supplier: "Metal Suppliers Inc",
-    quantity: "500",
-    unitCost: "৳12",
-    total: "৳6,000",
-    date: "2026-04-15",
-  },
-];
-
-const demoSuppliers = ["Metal Suppliers Inc", "Industrial Materials Co", "Prime Alloys Ltd", "Delta Chemicals", "Northern Steel Works"];
+import { createRawMaterialPurchase, getRawMaterialPurchases, getUploadUrl } from "@/shared/lib/raw-material-purchase-api";
+import { getRawMaterialStocks } from "@/shared/lib/raw-material-stock-api";
+import { getRawMaterialSuppliers } from "@/shared/lib/raw-material-supplier-api";
 
 function SearchIcon() {
   return (
@@ -80,36 +70,142 @@ function UploadIcon() {
   );
 }
 
+function StarIcon({ filled = false }) {
+  return (
+    <svg aria-hidden="true" className="h-5 w-5" fill={filled ? "currentColor" : "none"} viewBox="0 0 24 24">
+      <path
+        d="M12 3.6l2.57 5.2 5.74.83-4.15 4.05.98 5.72L12 16.7l-5.14 2.7.98-5.72-4.15-4.05 5.74-.83L12 3.6z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
+
+const supplierRatingOptions = [1, 2, 3, 4, 5];
+
 export function MaterialPurchasePage() {
-  const [purchases, setPurchases] = useState(initialPurchases);
+  const [purchases, setPurchases] = useState([]);
+  const [purchasesLoading, setPurchasesLoading] = useState(true);
+  const [stockMaterials, setStockMaterials] = useState([]);
+  const [supplierOptions, setSupplierOptions] = useState([]);
+  const [suppliersLoading, setSuppliersLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState("");
-  const [dateFrom, setDateFrom] = useState("23-04-2024");
-  const [dateTo, setDateTo] = useState("23-04-2024");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [isAddPurchaseModalOpen, setIsAddPurchaseModalOpen] = useState(false);
+  const [isMaterialSuggestionsOpen, setIsMaterialSuggestionsOpen] = useState(false);
+  const [receiptPreview, setReceiptPreview] = useState(null);
   const [formValues, setFormValues] = useState({
     material: "",
     supplier: "",
     quantity: "",
     unitCost: "",
+    supplierRating: "",
     date: "",
     receiptName: "",
+    receiptFile: null,
+    category: "",
+    minimumStock: "",
   });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPurchases() {
+      try {
+        const records = await getRawMaterialPurchases();
+
+        if (isMounted) {
+          setPurchases(records);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setPurchasesLoading(false);
+        }
+      }
+    }
+
+    async function loadStockMaterials() {
+      try {
+        const materials = await getRawMaterialStocks();
+
+        if (isMounted) {
+          setStockMaterials(materials);
+        }
+      } catch {
+        if (isMounted) {
+          setStockMaterials([]);
+        }
+      }
+    }
+
+    async function loadSuppliers() {
+      try {
+        const suppliers = await getRawMaterialSuppliers();
+
+        if (isMounted) {
+          setSupplierOptions(suppliers);
+        }
+      } catch {
+        if (isMounted) {
+          setSupplierOptions([]);
+        }
+      } finally {
+        if (isMounted) {
+          setSuppliersLoading(false);
+        }
+      }
+    }
+
+    loadPurchases();
+    loadStockMaterials();
+    loadSuppliers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const selectedSupplier = supplierOptions.find((supplier) => String(supplier.recordId) === formValues.supplier);
+  const materialSuggestions = stockMaterials
+    .filter((item) => item.material.toLowerCase().includes(formValues.material.trim().toLowerCase()))
+    .filter((item, index, array) => array.findIndex((entry) => entry.material.toLowerCase() === item.material.toLowerCase()) === index)
+    .slice(0, 6);
+  const matchingStockMaterial = stockMaterials.find(
+    (item) => item.material.trim().toLowerCase() === formValues.material.trim().toLowerCase(),
+  );
+  const isNewMaterial = formValues.material.trim() && !matchingStockMaterial;
+  const receiptPreviewUrl = receiptPreview?.receiptLocation ? getUploadUrl(receiptPreview.receiptLocation) : "";
+  const isReceiptPreviewPdf = /\.pdf($|\?)/i.test(receiptPreviewUrl);
 
   const filteredPurchases = purchases.filter((purchase) => {
     const query = search.toLowerCase();
-    return (
+    const matchesSearch =
       purchase.id.toLowerCase().includes(query) ||
       purchase.material.toLowerCase().includes(query) ||
-      purchase.supplier.toLowerCase().includes(query)
-    );
+      purchase.supplier.toLowerCase().includes(query);
+
+    const matchesDateFrom = !dateFrom || purchase.dateValue >= dateFrom;
+    const matchesDateTo = !dateTo || purchase.dateValue <= dateTo;
+
+    return matchesSearch && matchesDateFrom && matchesDateTo;
   });
 
   function handleExport() {
-    const header = ["Purchase ID", "Material", "Supplier", "Quantity", "Unit Cost", "Total", "Date"];
-    const rows = purchases.map((purchase) => [
+    const header = ["Purchase ID", "Material", "Supplier", "Rating", "Quantity", "Unit Cost", "Total", "Date"];
+    const rows = filteredPurchases.map((purchase) => [
       purchase.id,
       purchase.material,
       purchase.supplier,
+      purchase.supplierRating,
       purchase.quantity,
       purchase.unitCost,
       purchase.total,
@@ -126,51 +222,95 @@ export function MaterialPurchasePage() {
   }
 
   function openAddPurchaseModal() {
+    setErrorMessage("");
+    setIsMaterialSuggestionsOpen(false);
     setIsAddPurchaseModalOpen(true);
   }
 
   function closeAddPurchaseModal() {
     setIsAddPurchaseModalOpen(false);
+    setIsMaterialSuggestionsOpen(false);
     setFormValues({
       material: "",
       supplier: "",
       quantity: "",
       unitCost: "",
+      supplierRating: "",
       date: "",
       receiptName: "",
+      receiptFile: null,
+      category: "",
+      minimumStock: "",
     });
+  }
+
+  function openReceiptPreview(purchase) {
+    setReceiptPreview(purchase);
+  }
+
+  function closeReceiptPreview() {
+    setReceiptPreview(null);
   }
 
   function handleFormChange(event) {
     const { name, value, files, type } = event.target;
     setFormValues((current) => ({
       ...current,
-      [name]: type === "file" ? files?.[0]?.name ?? "" : value,
+      [name]:
+        type === "file"
+          ? files?.[0]?.name ?? ""
+          : value,
+      ...(type === "file" ? { receiptFile: files?.[0] ?? null } : {}),
     }));
+
+    if (name === "material" && type !== "file") {
+      setIsMaterialSuggestionsOpen(true);
+    }
   }
 
-  function handleAddPurchase(event) {
-    event.preventDefault();
-    const nextNumber = purchases.length + 1;
-    const padded = String(nextNumber).padStart(3, "0");
-    const quantity = Number(formValues.quantity || 0);
-    const unitCost = Number(formValues.unitCost || 0);
-    const total = quantity * unitCost;
-
-    setPurchases((current) => [
+  function handleMaterialSelect(materialName) {
+    setFormValues((current) => ({
       ...current,
-      {
-        id: `PUR-${padded}`,
-        material: formValues.material,
-        supplier: formValues.supplier,
-        quantity: String(quantity),
-        unitCost: `৳${unitCost}`,
-        total: `৳${total.toLocaleString("en-US")}`,
-        date: formValues.date,
-      },
-    ]);
+      material: materialName,
+    }));
+    setIsMaterialSuggestionsOpen(false);
+  }
 
-    closeAddPurchaseModal();
+  async function handleAddPurchase(event) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      const payload = new FormData();
+      payload.append("material", formValues.material);
+      payload.append("supplierId", formValues.supplier);
+      payload.append("quantity", formValues.quantity);
+      payload.append("unitCost", formValues.unitCost);
+      payload.append("supplierRating", formValues.supplierRating);
+      payload.append("date", formValues.date);
+      payload.append("receipt", formValues.receiptFile);
+      payload.append("isNewMaterial", String(Boolean(isNewMaterial)));
+      if (isNewMaterial) {
+        payload.append("category", formValues.category);
+        payload.append("minimumStock", formValues.minimumStock);
+      }
+
+      const newPurchase = await createRawMaterialPurchase(payload);
+      setPurchases((current) => [newPurchase, ...current]);
+      if (isNewMaterial) {
+        const materials = await getRawMaterialStocks();
+        setStockMaterials(materials);
+      } else if (matchingStockMaterial) {
+        const materials = await getRawMaterialStocks();
+        setStockMaterials(materials);
+      }
+      closeAddPurchaseModal();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -201,6 +341,8 @@ export function MaterialPurchasePage() {
         </div>
       </div>
 
+      {errorMessage ? <div className="rounded-md border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[14px] text-[#f7c8cf]">{errorMessage}</div> : null}
+
       <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_140px_40px_140px]">
           <label className="flex h-11 items-center gap-3 rounded-md border border-[#334156] bg-[#243045] px-4 text-[#77879d]">
@@ -214,58 +356,89 @@ export function MaterialPurchasePage() {
             />
           </label>
 
-          <button
-            className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]"
-            onClick={() => setDateFrom("23-04-2024")}
-            type="button"
-          >
-            <span>{dateFrom}</span>
-            <ChevronRightIcon />
-          </button>
+          <label className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]">
+            <input
+              className="w-full bg-transparent text-[12px] text-[#d6ddea] outline-none"
+              onChange={(event) => setDateFrom(event.target.value)}
+              type="date"
+              value={dateFrom}
+            />
+          </label>
 
           <div className="flex items-center justify-center text-[12px] text-[#9aa6bb]">to</div>
 
-          <button
-            className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]"
-            onClick={() => setDateTo("23-04-2024")}
-            type="button"
-          >
-            <span>{dateTo}</span>
-            <ChevronRightIcon />
-          </button>
+          <label className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]">
+            <input
+              className="w-full bg-transparent text-[12px] text-[#d6ddea] outline-none"
+              onChange={(event) => setDateTo(event.target.value)}
+              type="date"
+              value={dateTo}
+            />
+          </label>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[920px] table-fixed border-collapse text-left">
+        <div className="mt-4 overflow-x-hidden">
+          <table className="w-full table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
-                <th className="w-[120px] pb-3 font-medium">Purchase ID</th>
-                <th className="w-[17%] pb-3 font-medium">Material</th>
-                <th className="w-[24%] pb-3 font-medium">Supplier</th>
-                <th className="w-[120px] pb-3 font-medium">Quantity</th>
-                <th className="w-[120px] pb-3 font-medium">Unit Cost</th>
-                <th className="w-[120px] pb-3 font-medium">Total</th>
-                <th className="w-[120px] pb-3 font-medium">Date</th>
-                <th className="w-[90px] pb-3 text-right font-medium">Reset</th>
+                <th className="w-[11%] pb-3 font-medium">Purchase ID</th>
+                <th className="w-[15%] pb-3 font-medium">Material</th>
+                <th className="w-[16%] pb-3 font-medium">Supplier</th>
+                <th className="w-[10%] pb-3 font-medium">Rating</th>
+                <th className="w-[10%] pb-3 font-medium">Quantity</th>
+                <th className="w-[11%] pb-3 font-medium">Unit Cost</th>
+                <th className="w-[11%] pb-3 font-medium">Total</th>
+                <th className="w-[8%] pb-3 font-medium">Date</th>
+                <th className="w-[8%] pb-3 text-center font-medium">Receipt</th>
               </tr>
             </thead>
             <tbody>
-              {filteredPurchases.map((purchase) => (
-                <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={purchase.id}>
-                  <td className="py-4 font-semibold text-[#f7a614]">{purchase.id}</td>
-                  <td className="py-4 pr-3">{purchase.material}</td>
-                  <td className="py-4 pr-3">{purchase.supplier}</td>
-                  <td className="py-4">{purchase.quantity}</td>
-                  <td className="py-4">{purchase.unitCost}</td>
-                  <td className="py-4 font-semibold text-[#f7a614]">{purchase.total}</td>
-                  <td className="py-4 text-[#98a5bb]">{purchase.date}</td>
-                  <td className="py-4 text-right">
-                    <button className="text-[13px] font-medium text-[#f7a614] transition hover:text-[#ffc550]" type="button">
-                      View
-                    </button>
+              {purchasesLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={9}>
+                    Loading material purchases...
                   </td>
                 </tr>
-              ))}
+              ) : filteredPurchases.length === 0 ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={9}>
+                    No material purchases found.
+                  </td>
+                </tr>
+              ) : (
+                filteredPurchases.map((purchase) => (
+                  <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={purchase.recordId}>
+                    <td className="truncate py-4 pr-3 font-semibold text-[#f7a614]">{purchase.id}</td>
+                    <td className="truncate py-4 pr-3">{purchase.material}</td>
+                    <td className="truncate py-4 pr-3">{purchase.supplier}</td>
+                    <td className="py-4">
+                      {purchase.supplierRating ? (
+                        <div className="flex items-center gap-0.5 text-[#f7a614]" aria-label={`${purchase.supplierRating} out of 5`}>
+                          {supplierRatingOptions.map((rating) => (
+                            <StarIcon filled={rating <= purchase.supplierRating} key={rating} />
+                          ))}
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="truncate py-4 pr-3">{purchase.quantity}</td>
+                    <td className="truncate py-4 pr-3">{purchase.unitCost}</td>
+                    <td className="truncate py-4 pr-3 font-semibold text-[#f7a614]">{purchase.total}</td>
+                    <td className="truncate py-4 pr-3 text-[#98a5bb]">{purchase.date}</td>
+                    <td className="py-4 text-center">
+                      <button
+                        className="inline-flex h-8 min-w-[52px] items-center justify-center rounded-md text-[13px] font-medium text-[#f7a614] transition hover:bg-[#f6a313]/10 hover:text-[#ffc550] disabled:opacity-50"
+                        disabled={!purchase.receiptLocation}
+                        onClick={() => openReceiptPreview(purchase)}
+                        type="button"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -282,35 +455,57 @@ export function MaterialPurchasePage() {
             </div>
 
             <form className="space-y-4 px-4 py-4" onSubmit={handleAddPurchase}>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
-                <label className="block space-y-2 md:col-span-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-8">
+                <label className="block space-y-2 md:col-span-4">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Material *</span>
-                  <input
-                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
-                    name="material"
-                    onChange={handleFormChange}
-                    required
-                    type="text"
-                    value={formValues.material}
-                  />
+                  <div className="relative">
+                    <input
+                      className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
+                      onBlur={() => {
+                        window.setTimeout(() => setIsMaterialSuggestionsOpen(false), 120);
+                      }}
+                      name="material"
+                      onChange={handleFormChange}
+                      onFocus={() => setIsMaterialSuggestionsOpen(true)}
+                      required
+                      type="text"
+                      value={formValues.material}
+                    />
+                    {isMaterialSuggestionsOpen && formValues.material.trim() && materialSuggestions.length > 0 ? (
+                      <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-10 overflow-hidden rounded-md border border-[#334156] bg-[#243045] shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                        {materialSuggestions.map((item) => (
+                          <button
+                            className="flex w-full items-center justify-between border-b border-[#334156] px-4 py-3 text-left text-[13px] text-[#d6ddea] transition hover:bg-[#2c3a52] last:border-b-0"
+                            key={item.recordId}
+                            onMouseDown={() => handleMaterialSelect(item.material)}
+                            type="button"
+                          >
+                            <span>{item.material}</span>
+                            <span className="text-[11px] text-[#8ea0bb]">{item.category}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </label>
 
-                <label className="block space-y-2 md:col-span-3">
+                <label className="block space-y-2 md:col-span-4">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Supplier *</span>
                   <div className="relative">
                     <select
                       className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 pr-11 text-[14px] text-[#e6ebf4] outline-none"
+                      disabled={suppliersLoading}
                       name="supplier"
                       onChange={handleFormChange}
                       required
                       value={formValues.supplier}
                     >
                       <option disabled value="">
-                        Select supplier
+                        {suppliersLoading ? "Loading suppliers..." : "Select supplier"}
                       </option>
-                      {demoSuppliers.map((supplier) => (
-                        <option key={supplier} value={supplier}>
-                          {supplier}
+                      {supplierOptions.map((supplier) => (
+                        <option key={supplier.recordId} value={supplier.recordId}>
+                          {supplier.name}
                         </option>
                       ))}
                     </select>
@@ -344,18 +539,79 @@ export function MaterialPurchasePage() {
                   />
                 </label>
 
+                <div className="block space-y-2 md:col-span-2">
+                  <span className="text-[14px] font-medium text-[#d6ddea]">Supplier Rating *</span>
+                  <div
+                    aria-label="Supplier rating"
+                    className="flex h-11 items-center gap-1 rounded-md border border-[#334156] bg-[#243045] px-3"
+                    role="radiogroup"
+                  >
+                    {supplierRatingOptions.map((rating) => {
+                      const isFilled = rating <= Number(formValues.supplierRating || 0);
+
+                      return (
+                        <label
+                          className={`cursor-pointer rounded p-0.5 transition ${
+                            isFilled ? "text-[#f7a614]" : "text-[#6f7f96] hover:text-[#f7a614]"
+                          }`}
+                          key={rating}
+                          title={`${rating} out of 5`}
+                        >
+                          <input
+                            checked={formValues.supplierRating === String(rating)}
+                            className="sr-only"
+                            name="supplierRating"
+                            onChange={handleFormChange}
+                            required
+                            type="radio"
+                            value={rating}
+                          />
+                          <StarIcon filled={isFilled} />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <label className="block space-y-2 md:col-span-2">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Date *</span>
                   <input
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
                     name="date"
                     onChange={handleFormChange}
-                    placeholder="DD/MM/YY"
                     required
-                    type="text"
+                    type="date"
                     value={formValues.date}
                   />
                 </label>
+
+                {isNewMaterial ? (
+                  <label className="block space-y-2 md:col-span-4">
+                    <span className="text-[14px] font-medium text-[#d6ddea]">Category *</span>
+                    <input
+                      className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
+                      name="category"
+                      onChange={handleFormChange}
+                      required
+                      type="text"
+                      value={formValues.category}
+                    />
+                  </label>
+                ) : null}
+
+                {isNewMaterial ? (
+                  <label className="block space-y-2 md:col-span-4">
+                    <span className="text-[14px] font-medium text-[#d6ddea]">Minimum Stock *</span>
+                    <input
+                      className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
+                      name="minimumStock"
+                      onChange={handleFormChange}
+                      required
+                      type="number"
+                      value={formValues.minimumStock}
+                    />
+                  </label>
+                ) : null}
               </div>
 
               <div className="block space-y-2">
@@ -363,7 +619,7 @@ export function MaterialPurchasePage() {
                 <label className="flex h-[66px] w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-[#3a475c] bg-[#243045] px-4 text-[14px] text-[#8997ac] transition hover:border-[#4b5a72]">
                   <UploadIcon />
                   <span className="truncate">{formValues.receiptName || "Upload Image or PDF (Max 5MB)"}</span>
-                  <input accept="image/*,.pdf" className="sr-only" name="receiptName" onChange={handleFormChange} type="file" />
+                  <input accept="image/*,.pdf" className="sr-only" name="receiptName" onChange={handleFormChange} required type="file" />
                 </label>
               </div>
 
@@ -373,12 +629,43 @@ export function MaterialPurchasePage() {
                 </button>
                 <button
                   className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                  disabled={isSubmitting || !selectedSupplier}
                   type="submit"
                 >
                   Add Purchase
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {receiptPreview ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1422]/75 px-4 py-4">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[820px] flex-col overflow-hidden rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between border-b border-[#314058] px-4 py-4">
+              <div>
+                <h3 className="text-[20px] font-semibold text-[#e6ebf4]">Purchase Receipt</h3>
+                <p className="mt-1 text-[13px] text-[#8f9cb0]">
+                  {receiptPreview.id} · {receiptPreview.material}
+                </p>
+              </div>
+              <button className="text-[#d7deea] transition hover:text-white" onClick={closeReceiptPreview} type="button">
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto bg-[#182235] p-4">
+              {isReceiptPreviewPdf ? (
+                <iframe className="h-[70vh] w-full rounded-md border border-[#314058] bg-white" src={receiptPreviewUrl} title="Purchase receipt" />
+              ) : (
+                <img
+                  alt="Purchase receipt"
+                  className="mx-auto max-h-[70vh] max-w-full rounded-md border border-[#314058] object-contain"
+                  src={receiptPreviewUrl}
+                />
+              )}
+            </div>
           </div>
         </div>
       ) : null}

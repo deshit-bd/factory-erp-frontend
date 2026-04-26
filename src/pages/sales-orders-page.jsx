@@ -1,29 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialOrders = [
-  {
-    id: "SO-001",
-    date: "2026-04-10",
-    buyer: "ABC Corp",
-    product: "Industrial Valves",
-    quantity: "500",
-    unitPrice: "৳120",
-    total: "৳60,000",
-    status: "Confirmed",
-  },
-  {
-    id: "SO-002",
-    date: "2026-04-08",
-    buyer: "XYZ Ltd",
-    product: "Steel Pipes",
-    quantity: "300",
-    unitPrice: "৳85",
-    total: "৳25,500",
-    status: "Completed",
-  },
-];
+import { getBuyers } from "@/shared/lib/buyer-api";
+import { createSalesOrder, deleteSalesOrder, getSalesOrders, updateSalesOrderStatus } from "@/shared/lib/sales-order-api";
 
-const demoBuyers = ["ABC Corp", "XYZ Ltd", "Global Textiles", "Northern Garments", "Prime Exports"];
+const ORDER_STATUS_OPTIONS = ["Pending", "Confirmed", "In Progress", "Completed"];
 
 function SearchIcon() {
   return (
@@ -109,35 +89,131 @@ function CloseIcon() {
   );
 }
 
+function formatOrderDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).split("T")[0];
+}
+
+function isWithinDateRange(value, dateFrom, dateTo) {
+  const normalizedValue = formatOrderDate(value);
+
+  if (!normalizedValue) {
+    return false;
+  }
+
+  if (dateFrom && normalizedValue < dateFrom) {
+    return false;
+  }
+
+  if (dateTo && normalizedValue > dateTo) {
+    return false;
+  }
+
+  return true;
+}
+
+function getStatusClasses(status) {
+  if (status === "Completed") {
+    return "bg-[#1f4f3c] text-[#68d8a3]";
+  }
+
+  if (status === "In Progress") {
+    return "bg-[#1d3b63] text-[#69a7ff]";
+  }
+
+  if (status === "Confirmed") {
+    return "bg-[#3c3158] text-[#b9a5ff]";
+  }
+
+  return "bg-[#57411f] text-[#f5b14e]";
+}
+
 export function SalesOrdersPage() {
-  const [orders, setOrders] = useState(initialOrders);
+  const [orders, setOrders] = useState([]);
+  const [buyerOptions, setBuyerOptions] = useState([]);
+  const [buyersLoading, setBuyersLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [updatingOrderIds, setUpdatingOrderIds] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState("");
-  const [dateFrom, setDateFrom] = useState("23-04-2024");
-  const [dateTo, setDateTo] = useState("23-04-2024");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [isCreateOrderModalOpen, setIsCreateOrderModalOpen] = useState(false);
   const [formValues, setFormValues] = useState({
     buyer: "",
     product: "",
     quantity: "",
     unitPrice: "",
-    date: "",
+    deliveryDate: "",
   });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadOrders() {
+      try {
+        const salesOrders = await getSalesOrders();
+
+        if (isMounted) {
+          setOrders(salesOrders);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setOrdersLoading(false);
+        }
+      }
+    }
+
+    async function loadBuyers() {
+      try {
+        const buyers = await getBuyers();
+
+        if (isMounted) {
+          setBuyerOptions(buyers);
+        }
+      } catch {
+        if (isMounted) {
+          setBuyerOptions([]);
+        }
+      } finally {
+        if (isMounted) {
+          setBuyersLoading(false);
+        }
+      }
+    }
+
+    loadOrders();
+    loadBuyers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredOrders = orders.filter((order) => {
     const query = search.toLowerCase();
-    return (
+    const matchesSearch =
       order.id.toLowerCase().includes(query) ||
       order.buyer.toLowerCase().includes(query) ||
       order.product.toLowerCase().includes(query) ||
-      order.status.toLowerCase().includes(query)
-    );
+      order.status.toLowerCase().includes(query);
+
+    return matchesSearch && isWithinDateRange(order.deliveryDate, dateFrom, dateTo);
   });
 
   function handleExport() {
-    const header = ["Order ID", "Date", "Buyer", "Product", "Quantity", "Unit Price", "Total", "Status"];
-    const rows = orders.map((order) => [
+    const header = ["Order ID", "Delivary Date", "Buyer", "Product", "Quantity", "Unit Price", "Total", "Status"];
+    const rows = filteredOrders.map((order) => [
       order.id,
-      order.date,
+      formatOrderDate(order.deliveryDate),
       order.buyer,
       order.product,
       order.quantity,
@@ -156,6 +232,7 @@ export function SalesOrdersPage() {
   }
 
   function openCreateOrderModal() {
+    setErrorMessage("");
     setIsCreateOrderModalOpen(true);
   }
 
@@ -166,7 +243,7 @@ export function SalesOrdersPage() {
       product: "",
       quantity: "",
       unitPrice: "",
-      date: "",
+      deliveryDate: "",
     });
   }
 
@@ -175,33 +252,47 @@ export function SalesOrdersPage() {
     setFormValues((current) => ({ ...current, [name]: value }));
   }
 
-  function handleCreateOrder(event) {
+  async function handleCreateOrder(event) {
     event.preventDefault();
-    const nextNumber = orders.length + 1;
-    const padded = String(nextNumber).padStart(3, "0");
-    const quantity = Number(formValues.quantity || 0);
-    const unitPrice = Number(formValues.unitPrice || 0);
-    const total = quantity * unitPrice;
+    setIsSubmitting(true);
+    setErrorMessage("");
 
-    setOrders((current) => [
-      ...current,
-      {
-        id: `SO-${padded}`,
-        date: formValues.date,
-        buyer: formValues.buyer,
-        product: formValues.product,
-        quantity: String(quantity),
-        unitPrice: `৳${unitPrice}`,
-        total: `৳${total.toLocaleString("en-US")}`,
-        status: "Confirmed",
-      },
-    ]);
+    try {
+      const newOrder = await createSalesOrder({
+        ...formValues,
+        status: "Pending",
+      });
 
-    closeCreateOrderModal();
+      setOrders((current) => [newOrder, ...current]);
+      closeCreateOrderModal();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  function handleDeleteOrder(id) {
-    setOrders((current) => current.filter((order) => order.id !== id));
+  async function handleDeleteOrder(recordId) {
+    try {
+      setErrorMessage("");
+      await deleteSalesOrder(recordId);
+      setOrders((current) => current.filter((order) => order.recordId !== recordId));
+    } catch (error) {
+      setErrorMessage(error.message);
+    }
+  }
+
+  async function handleStatusChange(recordId, status) {
+    try {
+      setErrorMessage("");
+      setUpdatingOrderIds((current) => [...current, recordId]);
+      const updatedOrder = await updateSalesOrderStatus(recordId, status);
+      setOrders((current) => current.map((order) => (order.recordId === recordId ? updatedOrder : order)));
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setUpdatingOrderIds((current) => current.filter((id) => id !== recordId));
+    }
   }
 
   return (
@@ -232,6 +323,8 @@ export function SalesOrdersPage() {
         </div>
       </div>
 
+      {errorMessage ? <div className="rounded-md border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[14px] text-[#f7c8cf]">{errorMessage}</div> : null}
+
       <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_140px_40px_140px]">
           <label className="flex h-11 items-center gap-3 rounded-md border border-[#334156] bg-[#243045] px-4 text-[#77879d]">
@@ -245,25 +338,25 @@ export function SalesOrdersPage() {
             />
           </label>
 
-          <button
-            className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]"
-            onClick={() => setDateFrom("23-04-2024")}
-            type="button"
-          >
-            <span>{dateFrom}</span>
-            <ChevronRightIcon />
-          </button>
+          <label className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]">
+            <input
+              className="w-full bg-transparent text-[12px] text-[#d6ddea] outline-none"
+              onChange={(event) => setDateFrom(event.target.value)}
+              type="date"
+              value={dateFrom}
+            />
+          </label>
 
           <div className="flex items-center justify-center text-[12px] text-[#9aa6bb]">to</div>
 
-          <button
-            className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]"
-            onClick={() => setDateTo("23-04-2024")}
-            type="button"
-          >
-            <span>{dateTo}</span>
-            <ChevronRightIcon />
-          </button>
+          <label className="flex h-11 items-center justify-between rounded-md border border-[#334156] bg-[#243045] px-4 text-[12px] text-[#d6ddea]">
+            <input
+              className="w-full bg-transparent text-[12px] text-[#d6ddea] outline-none"
+              onChange={(event) => setDateTo(event.target.value)}
+              type="date"
+              value={dateTo}
+            />
+          </label>
         </div>
 
         <div className="mt-4 overflow-x-auto">
@@ -271,7 +364,7 @@ export function SalesOrdersPage() {
             <thead>
               <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
                 <th className="w-[74px] pb-3 font-medium">Order ID</th>
-                <th className="w-[98px] pb-3 font-medium">Date</th>
+                <th className="w-[98px] pb-3 font-medium">Delivary Date</th>
                 <th className="w-[12%] pb-3 font-medium">Buyer</th>
                 <th className="w-[18%] pb-3 font-medium">Product</th>
                 <th className="w-[78px] pb-3 font-medium">Quantity</th>
@@ -282,41 +375,64 @@ export function SalesOrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map((order) => (
-                <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={order.id}>
-                  <td className="py-4 font-semibold text-[#f7a614]">{order.id}</td>
-                  <td className="py-4 text-[#98a5bb]">{order.date}</td>
-                  <td className="py-4 pr-3">{order.buyer}</td>
-                  <td className="py-4 pr-3">{order.product}</td>
-                  <td className="py-4">{order.quantity}</td>
-                  <td className="py-4">{order.unitPrice}</td>
-                  <td className="py-4 font-semibold text-[#f7a614]">{order.total}</td>
-                  <td className="py-4">
-                    <span
-                      className={[
-                        "inline-flex rounded-sm px-2 py-1 text-[11px] font-medium",
-                        order.status === "Confirmed" ? "bg-[#1d3b63] text-[#69a7ff]" : "bg-[#57411f] text-[#f5b14e]",
-                      ].join(" ")}
-                    >
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="py-4">
-                    <div className="flex justify-end gap-4">
-                      <button className="text-[#d7deea] transition hover:text-white" type="button">
-                        <EditIcon />
-                      </button>
-                      <button
-                        className="text-[#ef4444] transition hover:text-[#f87171]"
-                        onClick={() => handleDeleteOrder(order.id)}
-                        type="button"
-                      >
-                        <TrashIcon />
-                      </button>
-                    </div>
+              {ordersLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={9}>
+                    Loading sales orders...
                   </td>
                 </tr>
-              ))}
+              ) : filteredOrders.length === 0 ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={9}>
+                    No sales orders found.
+                  </td>
+                </tr>
+              ) : (
+                filteredOrders.map((order) => (
+                  <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={order.recordId}>
+                  <td className="py-4 font-semibold text-[#f7a614]">{order.id}</td>
+                    <td className="py-4 text-[#98a5bb]">{formatOrderDate(order.deliveryDate)}</td>
+                    <td className="py-4 pr-3">{order.buyer}</td>
+                    <td className="py-4 pr-3">{order.product}</td>
+                    <td className="py-4">{order.quantity}</td>
+                    <td className="py-4">{order.unitPrice}</td>
+                    <td className="py-4 font-semibold text-[#f7a614]">{order.total}</td>
+                    <td className="py-4">
+                      <div className="relative">
+                        <select
+                          className={["h-9 w-full appearance-none rounded-md border border-transparent px-3 pr-9 text-[12px] font-medium outline-none", getStatusClasses(order.status)].join(" ")}
+                          disabled={updatingOrderIds.includes(order.recordId)}
+                          onChange={(event) => handleStatusChange(order.recordId, event.target.value)}
+                          value={order.status}
+                        >
+                          {ORDER_STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-current">
+                          <ChevronDownIcon />
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-4">
+                      <div className="flex justify-end gap-4">
+                        <button className="text-[#d7deea] transition hover:text-white" type="button">
+                          <EditIcon />
+                        </button>
+                        <button
+                          className="text-[#ef4444] transition hover:text-[#f87171]"
+                          onClick={() => handleDeleteOrder(order.recordId)}
+                          type="button"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -338,17 +454,18 @@ export function SalesOrdersPage() {
                 <div className="relative">
                   <select
                     className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 pr-11 text-[14px] text-[#d6ddea] outline-none"
+                    disabled={buyersLoading}
                     name="buyer"
                     onChange={handleFormChange}
                     required
                     value={formValues.buyer}
                   >
                     <option disabled value="">
-                      Select buyer
+                      {buyersLoading ? "Loading buyers..." : "Select buyer"}
                     </option>
-                    {demoBuyers.map((buyer) => (
-                      <option key={buyer} value={buyer}>
-                        {buyer}
+                    {buyerOptions.map((buyer) => (
+                      <option key={buyer.recordId} value={buyer.company}>
+                        {buyer.company}
                       </option>
                     ))}
                   </select>
@@ -398,14 +515,14 @@ export function SalesOrdersPage() {
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-[14px] text-[#d7deea]">Date *</span>
+                <span className="mb-2 block text-[14px] text-[#d7deea]">Delivery Date *</span>
                 <input
                   className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#d6ddea] outline-none placeholder:text-[#77879d]"
-                  name="date"
+                  name="deliveryDate"
                   onChange={handleFormChange}
                   required
                   type="date"
-                  value={formValues.date}
+                  value={formValues.deliveryDate}
                 />
               </label>
 
@@ -418,10 +535,11 @@ export function SalesOrdersPage() {
                   Cancel
                 </button>
                 <button
-                  className="inline-flex h-10 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                  className="inline-flex h-10 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733] disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isSubmitting}
                   type="submit"
                 >
-                  Create Order
+                  {isSubmitting ? "Creating..." : "Create Order"}
                 </button>
               </div>
             </form>

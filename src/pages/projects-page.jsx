@@ -1,34 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialProjects = [
-  {
-    id: "PRJ-001",
-    name: "Industrial Valves Order",
-    buyer: "ABC Corp",
-    startDate: "2026-04-01",
-    dueDate: "2026-05-01",
-    status: "In Progress",
-    progress: 65,
-  },
-  {
-    id: "PRJ-002",
-    name: "Steel Pipes Manufacturing",
-    buyer: "XYZ Ltd",
-    startDate: "2026-03-15",
-    dueDate: "2026-04-15",
-    status: "Completed",
-    progress: 100,
-  },
-  {
-    id: "PRJ-003",
-    name: "Custom Fittings",
-    buyer: "DEF Inc",
-    startDate: "2026-04-10",
-    dueDate: "2026-05-20",
-    status: "Pending",
-    progress: 20,
-  },
-];
+import { getProjects } from "@/shared/lib/project-api";
 
 function SearchIcon() {
   return (
@@ -70,13 +42,56 @@ function CloseIcon() {
   );
 }
 
+function formatProjectDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  return String(value).split("T")[0];
+}
+
+function getProjectStatusClasses(status) {
+  return status === "Completed" ? "bg-[#1f4f3c] text-[#68d8a3]" : "bg-[#1d3b63] text-[#69a7ff]";
+}
+
 export function ProjectsPage() {
-  const [projects] = useState(initialProjects);
+  const [projects, setProjects] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("23-04-2024");
   const [dateTo, setDateTo] = useState("23-04-2024");
   const [selectedProject, setSelectedProject] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProjects() {
+      try {
+        const records = await getProjects();
+
+        if (isMounted) {
+          setProjects(records);
+          setSelectedProject((current) => records.find((project) => project.recordId === current?.recordId) || current);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setProjectsLoading(false);
+        }
+      }
+    }
+
+    loadProjects();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredProjects = projects.filter((project) => {
     const query = search.toLowerCase();
@@ -89,13 +104,13 @@ export function ProjectsPage() {
   });
 
   function handleExport() {
-    const header = ["Project ID", "Name", "Buyer", "Start Date", "Due Date", "Status", "Progress"];
+    const header = ["Project ID", "Name", "Buyer", "Start Date", "Delivery Date", "Status", "Progress"];
     const rows = projects.map((project) => [
       project.id,
       project.name,
       project.buyer,
-      project.startDate,
-      project.dueDate,
+      formatProjectDate(project.startDate),
+      formatProjectDate(project.deliveryDate),
       project.status,
       `${project.progress}%`,
     ]);
@@ -149,9 +164,11 @@ export function ProjectsPage() {
         </div>
       </div>
 
+      {errorMessage ? <div className="rounded-md border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[14px] text-[#f7c8cf]">{errorMessage}</div> : null}
+
       <div
         className={[
-          "grid min-h-[560px] grid-cols-1 gap-0",
+          "grid grid-cols-1 gap-0",
           isDetailsOpen ? "xl:grid-cols-[minmax(0,1fr)_310px]" : "xl:grid-cols-1",
         ].join(" ")}
       >
@@ -168,66 +185,71 @@ export function ProjectsPage() {
           </label>
 
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[880px] table-fixed border-collapse text-left">
+            <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
-                  <th className="w-[90px] pb-3 font-medium">Project ID</th>
-                  <th className="w-[26%] pb-3 font-medium">Name</th>
-                  <th className="w-[15%] pb-3 font-medium">Buyer</th>
-                  <th className="w-[14%] pb-3 font-medium">Start Date</th>
-                  <th className="w-[14%] pb-3 font-medium">Due Date</th>
-                  <th className="w-[14%] pb-3 font-medium">Status</th>
-                  <th className="w-[120px] pb-3 font-medium">Progress</th>
+                  <th className="pb-3 pr-6 font-medium">Project ID</th>
+                  <th className="pb-3 pr-6 font-medium">Name</th>
+                  <th className="pb-3 pr-6 font-medium">Buyer</th>
+                  <th className="pb-3 pr-6 font-medium">Start Date</th>
+                  <th className="pb-3 pr-6 font-medium">Delivery Date</th>
+                  <th className="pb-3 pr-6 font-medium">Status</th>
+                  <th className="pb-3 font-medium">Progress</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredProjects.map((project) => (
-                  <tr
-                    className={[
-                      "cursor-pointer border-b border-[#2d394d] text-[13px] text-[#d7deea] transition",
-                      selectedProject?.id === project.id && isDetailsOpen ? "bg-[#1b2434]" : "hover:bg-[#263248]/35",
-                    ].join(" ")}
-                    key={project.id}
-                    onClick={() => {
-                      setSelectedProject(project);
-                      setIsDetailsOpen(true);
-                    }}
-                  >
-                    <td className="py-4 font-semibold text-[#f7a614]">{project.id}</td>
-                    <td className="py-4 pr-3">{project.name}</td>
-                    <td className="py-4 pr-3">{project.buyer}</td>
-                    <td className="py-4 text-[#98a5bb]">{project.startDate}</td>
-                    <td className="py-4 text-[#98a5bb]">{project.dueDate}</td>
-                    <td className="py-4">
-                      <span
-                        className={[
-                          "inline-flex rounded-sm px-2 py-1 text-[11px] font-medium",
-                          project.status === "In Progress" && "bg-[#1d3b63] text-[#69a7ff]",
-                          project.status === "Completed" && "bg-[#57411f] text-[#f5b14e]",
-                          project.status === "Pending" && "bg-[#5b3b21] text-[#f5a14e]",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                      >
-                        {project.status}
-                      </span>
-                    </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-1.5 w-14 rounded-full bg-[#dbeafe]">
-                          <div className="h-1.5 rounded-full bg-[#2563eb]" style={{ width: `${project.progress}%` }} />
-                        </div>
-                        <span className="text-[11px] text-[#64748b]">{project.progress}%</span>
-                      </div>
+                {projectsLoading ? (
+                  <tr>
+                    <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={7}>
+                      Loading projects...
                     </td>
                   </tr>
-                ))}
+                ) : filteredProjects.length === 0 ? (
+                  <tr>
+                    <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={7}>
+                      No projects found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProjects.map((project) => (
+                    <tr
+                      className={[
+                        "cursor-pointer border-b border-[#2d394d] text-[13px] text-[#d7deea] transition",
+                        selectedProject?.id === project.id && isDetailsOpen ? "bg-[#1b2434]" : "hover:bg-[#263248]/35",
+                      ].join(" ")}
+                      key={project.id}
+                      onClick={() => {
+                        setSelectedProject(project);
+                        setIsDetailsOpen(true);
+                      }}
+                    >
+                      <td className="py-4 font-semibold text-[#f7a614]">{project.id}</td>
+                      <td className="py-4 pr-3">{project.name}</td>
+                      <td className="py-4 pr-3">{project.buyer}</td>
+                      <td className="py-4 text-[#98a5bb]">{formatProjectDate(project.startDate)}</td>
+                      <td className="py-4 text-[#98a5bb]">{formatProjectDate(project.deliveryDate)}</td>
+                      <td className="py-4">
+                        <span className={["inline-flex rounded-sm px-2 py-1 text-[11px] font-medium", getProjectStatusClasses(project.status)].join(" ")}>
+                          {project.status}
+                        </span>
+                      </td>
+                      <td className="py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-1.5 w-14 rounded-full bg-[#dbeafe]">
+                            <div className="h-1.5 rounded-full bg-[#2563eb]" style={{ width: `${project.progress}%` }} />
+                          </div>
+                          <span className="text-[11px] text-[#64748b]">{project.progress}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </article>
 
-        {isDetailsOpen ? (
+        {isDetailsOpen && selectedProject ? (
           <aside className="border border-[#314058] bg-[#263248] px-5 py-4 xl:border-l-0 xl:rounded-r-md xl:rounded-l-none">
             <div className="flex items-center justify-between">
               <h3 className="text-[18px] font-semibold text-[#e6ebf4]">Project Details</h3>
@@ -259,16 +281,7 @@ export function ProjectsPage() {
               <div>
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">Status</div>
                 <div className="mt-2">
-                  <span
-                    className={[
-                      "inline-flex rounded-sm px-2 py-1 text-[11px] font-medium",
-                      selectedProject.status === "In Progress" && "bg-[#1d3b63] text-[#69a7ff]",
-                      selectedProject.status === "Completed" && "bg-[#57411f] text-[#f5b14e]",
-                      selectedProject.status === "Pending" && "bg-[#5b3b21] text-[#f5a14e]",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
+                  <span className={["inline-flex rounded-sm px-2 py-1 text-[11px] font-medium", getProjectStatusClasses(selectedProject.status)].join(" ")}>
                     {selectedProject.status}
                   </span>
                 </div>
@@ -287,7 +300,7 @@ export function ProjectsPage() {
               <div>
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">Timeline</div>
                 <div className="mt-2 text-[13px] text-[#d7deea]">
-                  {selectedProject.startDate} - {selectedProject.dueDate}
+                  {formatProjectDate(selectedProject.startDate)} - {formatProjectDate(selectedProject.deliveryDate)}
                 </div>
               </div>
             </div>

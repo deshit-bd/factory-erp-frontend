@@ -1,34 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialBuyers = [
-  {
-    id: "BYR-001",
-    name: "John Smith",
-    company: "ABC Corp",
-    email: "john@abc.com",
-    phone: "+1-234-5678",
-    country: "USA",
-    status: "Active",
-  },
-  {
-    id: "BYR-002",
-    name: "Sarah Johnson",
-    company: "XYZ Ltd",
-    email: "sarah@xyz.com",
-    phone: "+1-234-5679",
-    country: "UK",
-    status: "Active",
-  },
-  {
-    id: "BYR-003",
-    name: "Michael Chen",
-    company: "DEF Inc",
-    email: "michael@def.com",
-    phone: "+1-234-5680",
-    country: "Singapore",
-    status: "Inactive",
-  },
-];
+import { createBuyer, deleteBuyer, getBuyers, updateBuyer, updateBuyerStatus } from "@/shared/lib/buyer-api";
 
 function SearchIcon() {
   return (
@@ -98,20 +70,71 @@ function CloseIcon() {
   );
 }
 
+const initialFormValues = {
+  name: "",
+  company: "",
+  email: "",
+  phone: "",
+  address: "",
+  country: "",
+  status: "",
+};
+const fallbackCountryOptions = ["Bangladesh", "India", "United Kingdom", "United States"];
+
 export function BuyerManagementPage() {
-  const [buyers, setBuyers] = useState(initialBuyers);
+  const [buyers, setBuyers] = useState([]);
+  const [countryOptions, setCountryOptions] = useState(fallbackCountryOptions);
   const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddBuyerModalOpen, setIsAddBuyerModalOpen] = useState(false);
   const [editingBuyerId, setEditingBuyerId] = useState(null);
-  const [formValues, setFormValues] = useState({
-    name: "",
-    company: "",
-    email: "",
-    phone: "",
-    address: "",
-    country: "",
-    status: "",
-  });
+  const [formValues, setFormValues] = useState(initialFormValues);
+
+  useEffect(() => {
+    async function loadBuyers() {
+      try {
+        setErrorMessage("");
+        const buyerList = await getBuyers();
+        setBuyers(buyerList);
+      } catch (error) {
+        setErrorMessage(error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadBuyers();
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCountries() {
+      try {
+        const response = await fetch("/countries.json");
+
+        if (!response.ok) {
+          throw new Error("Failed to load countries.");
+        }
+
+        const countries = await response.json();
+
+        if (isMounted && Array.isArray(countries) && countries.length > 0) {
+          setCountryOptions(countries);
+        }
+      } catch {
+        // Keep the small fallback list when the JSON file is unavailable.
+      }
+    }
+
+    loadCountries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredBuyers = buyers.filter((buyer) => {
     const query = search.toLowerCase();
@@ -128,27 +151,19 @@ export function BuyerManagementPage() {
 
   function openAddBuyerModal() {
     setEditingBuyerId(null);
-    setFormValues({
-      name: "",
-      company: "",
-      email: "",
-      phone: "",
-      address: "",
-      country: "",
-      status: "",
-    });
+    setFormValues(initialFormValues);
     setIsAddBuyerModalOpen(true);
   }
 
   function openEditBuyerModal(buyer) {
-    setEditingBuyerId(buyer.id);
+    setEditingBuyerId(buyer.recordId);
     setFormValues({
       name: buyer.name,
       company: buyer.company,
       email: buyer.email,
-      phone: buyer.phone,
-      address: buyer.address ?? "",
-      country: buyer.country,
+      phone: buyer.phone || "",
+      address: buyer.address || "",
+      country: buyer.country || "",
       status: buyer.status,
     });
     setIsAddBuyerModalOpen(true);
@@ -156,16 +171,8 @@ export function BuyerManagementPage() {
 
   function closeAddBuyerModal() {
     setEditingBuyerId(null);
+    setFormValues(initialFormValues);
     setIsAddBuyerModalOpen(false);
-    setFormValues({
-      name: "",
-      company: "",
-      email: "",
-      phone: "",
-      address: "",
-      country: "",
-      status: "",
-    });
   }
 
   function handleFormChange(event) {
@@ -173,45 +180,26 @@ export function BuyerManagementPage() {
     setFormValues((current) => ({ ...current, [name]: value }));
   }
 
-  function handleAddBuyer(event) {
+  async function handleAddBuyer(event) {
     event.preventDefault();
-    if (editingBuyerId) {
-      setBuyers((current) =>
-        current.map((buyer) =>
-          buyer.id === editingBuyerId
-            ? {
-                ...buyer,
-                name: formValues.name,
-                company: formValues.company,
-                email: formValues.email,
-                phone: formValues.phone,
-                address: formValues.address,
-                country: formValues.country,
-                status: formValues.status,
-              }
-            : buyer,
-        ),
-      );
-    } else {
-      const nextNumber = buyers.length + 1;
-      const padded = String(nextNumber).padStart(3, "0");
+    setIsSubmitting(true);
+    setErrorMessage("");
 
-      setBuyers((current) => [
-        ...current,
-        {
-          id: `BYR-${padded}`,
-          name: formValues.name,
-          company: formValues.company,
-          email: formValues.email,
-          phone: formValues.phone,
-          address: formValues.address,
-          country: formValues.country,
-          status: formValues.status,
-        },
-      ]);
+    try {
+      if (editingBuyerId) {
+        const updatedBuyer = await updateBuyer(editingBuyerId, formValues);
+        setBuyers((current) => current.map((buyer) => (buyer.recordId === editingBuyerId ? updatedBuyer : buyer)));
+      } else {
+        const newBuyer = await createBuyer(formValues);
+        setBuyers((current) => [...current, newBuyer]);
+      }
+
+      closeAddBuyerModal();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    closeAddBuyerModal();
   }
 
   function handleExport() {
@@ -227,16 +215,26 @@ export function BuyerManagementPage() {
     URL.revokeObjectURL(url);
   }
 
-  function handleDeleteBuyer(id) {
-    setBuyers((current) => current.filter((buyer) => buyer.id !== id));
+  async function handleDeleteBuyer(recordId) {
+    try {
+      setErrorMessage("");
+      await deleteBuyer(recordId);
+      setBuyers((current) => current.filter((buyer) => buyer.recordId !== recordId));
+    } catch (error) {
+      setErrorMessage(error.message);
+    }
   }
 
-  function handleToggleStatus(id) {
-    setBuyers((current) =>
-      current.map((buyer) =>
-        buyer.id === id ? { ...buyer, status: buyer.status === "Active" ? "Inactive" : "Active" } : buyer,
-      ),
-    );
+  async function handleToggleStatus(buyer) {
+    const nextStatus = buyer.status === "Active" ? "Inactive" : "Active";
+
+    try {
+      setErrorMessage("");
+      const updatedBuyer = await updateBuyerStatus(buyer.recordId, nextStatus);
+      setBuyers((current) => current.map((item) => (item.recordId === buyer.recordId ? updatedBuyer : item)));
+    } catch (error) {
+      setErrorMessage(error.message);
+    }
   }
 
   return (
@@ -267,6 +265,8 @@ export function BuyerManagementPage() {
         </div>
       </div>
 
+      {errorMessage ? <div className="rounded-md border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[14px] text-[#f7c8cf]">{errorMessage}</div> : null}
+
       <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
         <label className="flex h-11 items-center gap-3 rounded-md border border-[#334156] bg-[#243045] px-4 text-[#77879d]">
           <SearchIcon />
@@ -294,53 +294,67 @@ export function BuyerManagementPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredBuyers.map((buyer) => (
-                <tr className="border-b border-[#2d394d] text-[14px] text-[#d7deea]" key={buyer.id}>
-                  <td className="py-4 font-semibold text-[#f7a614]">{buyer.id}</td>
-                  <td className="py-4 pr-3">{buyer.name}</td>
-                  <td className="py-4 pr-3 text-[#d7deea]">{buyer.company}</td>
-                  <td className="py-4 pr-3 text-[#98a5bb]">{buyer.email}</td>
-                  <td className="py-4 pr-3 text-[#d7deea]">{buyer.phone}</td>
-                  <td className="py-4 pr-3 text-[#d7deea]">{buyer.country}</td>
-                  <td className="py-4">
-                    <button
-                      className={[
-                        "inline-flex rounded-sm px-2 py-1 text-[11px] font-medium",
-                        buyer.status === "Active" ? "bg-[#6d4c1b] text-[#f5b14e]" : "bg-[#4a5568] text-[#cdd6e3]",
-                      ].join(" ")}
-                      onClick={() => handleToggleStatus(buyer.id)}
-                      type="button"
-                    >
-                      {buyer.status}
-                    </button>
-                  </td>
-                  <td className="py-4">
-                    <div className="flex justify-end gap-4">
-                      <button
-                        className="text-[#d7deea] transition hover:text-white"
-                        onClick={() => openEditBuyerModal(buyer)}
-                        type="button"
-                      >
-                        <EditIcon />
-                      </button>
-                      <button
-                        className="text-[#ef4444] transition hover:text-[#f87171]"
-                        onClick={() => handleDeleteBuyer(buyer.id)}
-                        type="button"
-                      >
-                        <TrashIcon />
-                      </button>
-                    </div>
+              {isLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={8}>
+                    Loading buyers...
                   </td>
                 </tr>
-              ))}
+              ) : filteredBuyers.length === 0 ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={8}>
+                    No buyers found.
+                  </td>
+                </tr>
+              ) : (
+                filteredBuyers.map((buyer) => (
+                  <tr className="border-b border-[#2d394d] text-[14px] text-[#d7deea]" key={buyer.recordId}>
+                    <td className="py-4 font-semibold text-[#f7a614]">{buyer.id}</td>
+                    <td className="py-4 pr-3">{buyer.name}</td>
+                    <td className="py-4 pr-3 text-[#d7deea]">{buyer.company}</td>
+                    <td className="py-4 pr-3 text-[#98a5bb]">{buyer.email}</td>
+                    <td className="py-4 pr-3 text-[#d7deea]">{buyer.phone}</td>
+                    <td className="py-4 pr-3 text-[#d7deea]">{buyer.country}</td>
+                    <td className="py-4">
+                      <button
+                        className={[
+                          "inline-flex rounded-sm px-2 py-1 text-[11px] font-medium",
+                          buyer.status === "Active" ? "bg-[#6d4c1b] text-[#f5b14e]" : "bg-[#4a5568] text-[#cdd6e3]",
+                        ].join(" ")}
+                        onClick={() => handleToggleStatus(buyer)}
+                        type="button"
+                      >
+                        {buyer.status}
+                      </button>
+                    </td>
+                    <td className="py-4">
+                      <div className="flex justify-end gap-4">
+                        <button
+                          className="text-[#d7deea] transition hover:text-white"
+                          onClick={() => openEditBuyerModal(buyer)}
+                          type="button"
+                        >
+                          <EditIcon />
+                        </button>
+                        <button
+                          className="text-[#ef4444] transition hover:text-[#f87171]"
+                          onClick={() => handleDeleteBuyer(buyer.recordId)}
+                          type="button"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </article>
 
       {isAddBuyerModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0d1422]/70 px-4 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#0d1422]/70 px-4 py-4">
           <div className="w-full max-h-[calc(100vh-2rem)] max-w-[980px] overflow-y-auto rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[#314058] px-4 py-4">
               <h3 className="text-[28px] font-semibold text-[#e6ebf4]">{editingBuyerId ? "Edit Buyer" : "Add New Buyer"}</h3>
@@ -416,14 +430,19 @@ export function BuyerManagementPage() {
 
                 <label className="block">
                   <span className="mb-2 block text-[15px] text-[#d7deea]">Country</span>
-                  <input
-                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#d6ddea] outline-none placeholder:text-[#77879d]"
+                  <select
+                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#d6ddea] outline-none"
                     name="country"
                     onChange={handleFormChange}
-                    placeholder="Enter country"
-                    type="text"
                     value={formValues.country}
-                  />
+                  >
+                    <option value="">Select country</option>
+                    {countryOptions.map((country) => (
+                      <option key={country} value={country}>
+                        {country}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label className="block">
@@ -451,10 +470,11 @@ export function BuyerManagementPage() {
                   Cancel
                 </button>
                 <button
-                  className="inline-flex h-10 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                  className="inline-flex h-10 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733] disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isSubmitting}
                   type="submit"
                 >
-                  {editingBuyerId ? "Save Buyer" : "Add Buyer"}
+                  {isSubmitting ? "Saving..." : editingBuyerId ? "Save Buyer" : "Add Buyer"}
                 </button>
               </div>
             </form>

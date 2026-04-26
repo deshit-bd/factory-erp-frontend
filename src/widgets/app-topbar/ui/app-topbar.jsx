@@ -70,6 +70,13 @@ export function AppTopbar({
   onToggleTheme,
   theme = "dark",
 }) {
+  const currentDate = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
+
   return (
     <header className="border-b border-[#2d384c] bg-[#1e2737] text-white">
       <div
@@ -108,7 +115,7 @@ export function AppTopbar({
             </button>
             <div className="flex min-w-0 flex-col">
               <h1 className="truncate text-[18px] font-semibold text-white">{title}</h1>
-              <p className="mt-0.5 text-[12px] text-[#93a0b4]">Sunday, April 19, 2026</p>
+              <p className="mt-0.5 text-[12px] text-[#93a0b4]">{currentDate}</p>
             </div>
           </div>
 

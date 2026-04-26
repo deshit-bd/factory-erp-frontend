@@ -1,37 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialMaterials = [
-  {
-    id: "MAT-001",
-    material: "Steel Rods",
-    category: "Raw Metal",
-    currentStock: "450 kg",
-    minStock: "500 kg",
-    unitCost: "৳12",
-    totalValue: "৳5,400",
-    status: "Low Stock",
-  },
-  {
-    id: "MAT-002",
-    material: "Aluminum Sheets",
-    category: "Raw Metal",
-    currentStock: "800 kg",
-    minStock: "300 kg",
-    unitCost: "৳18",
-    totalValue: "৳14,400",
-    status: "Normal",
-  },
-  {
-    id: "MAT-003",
-    material: "Copper Wire",
-    category: "Electrical",
-    currentStock: "200 meters",
-    minStock: "150 meters",
-    unitCost: "৳25",
-    totalValue: "৳5,000",
-    status: "Normal",
-  },
-];
+import { createRawMaterialStock, getRawMaterialStocks } from "@/shared/lib/raw-material-stock-api";
 
 function SearchIcon() {
   return (
@@ -121,28 +90,62 @@ function StockCardIcon({ type }) {
 }
 
 export function RawMaterialStockPage() {
-  const [materials, setMaterials] = useState(initialMaterials);
+  const [materials, setMaterials] = useState([]);
+  const [materialsLoading, setMaterialsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState("");
-  const [dateFrom, setDateFrom] = useState("23-04-2024");
-  const [dateTo, setDateTo] = useState("23-04-2024");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [isAddMaterialModalOpen, setIsAddMaterialModalOpen] = useState(false);
   const [formValues, setFormValues] = useState({
     material: "",
     category: "",
     currentStock: "",
     minimumStock: "",
-    unit: "",
     unitCost: "",
   });
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadMaterials() {
+      try {
+        const records = await getRawMaterialStocks();
+
+        if (isMounted) {
+          setMaterials(records);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setMaterialsLoading(false);
+        }
+      }
+    }
+
+    loadMaterials();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const filteredMaterials = materials.filter((material) => {
     const query = search.toLowerCase();
-    return (
+    const matchesSearch =
       material.id.toLowerCase().includes(query) ||
       material.material.toLowerCase().includes(query) ||
       material.category.toLowerCase().includes(query) ||
-      material.status.toLowerCase().includes(query)
-    );
+      material.status.toLowerCase().includes(query);
+
+    const matchesDateFrom = !dateFrom || material.createdAt >= `${dateFrom} 00:00:00`;
+    const matchesDateTo = !dateTo || material.createdAt <= `${dateTo} 23:59:59`;
+
+    return matchesSearch && matchesDateFrom && matchesDateTo;
   });
 
   const totalItems = materials.length;
@@ -159,7 +162,7 @@ export function RawMaterialStockPage() {
       material.material,
       material.category,
       material.currentStock,
-      material.minStock,
+      material.minimumStock,
       material.unitCost,
       material.totalValue,
       material.status,
@@ -175,6 +178,7 @@ export function RawMaterialStockPage() {
   }
 
   function openAddMaterialModal() {
+    setErrorMessage("");
     setIsAddMaterialModalOpen(true);
   }
 
@@ -185,7 +189,6 @@ export function RawMaterialStockPage() {
       category: "",
       currentStock: "",
       minimumStock: "",
-      unit: "",
       unitCost: "",
     });
   }
@@ -195,30 +198,27 @@ export function RawMaterialStockPage() {
     setFormValues((current) => ({ ...current, [name]: value }));
   }
 
-  function handleAddMaterial(event) {
+  async function handleAddMaterial(event) {
     event.preventDefault();
-    const nextNumber = materials.length + 1;
-    const padded = String(nextNumber).padStart(3, "0");
-    const currentStockNumber = Number(formValues.currentStock || 0);
-    const minimumStockNumber = Number(formValues.minimumStock || 0);
-    const unitCostNumber = Number(formValues.unitCost || 0);
-    const totalValueNumber = currentStockNumber * unitCostNumber;
+    setIsSubmitting(true);
+    setErrorMessage("");
 
-    setMaterials((current) => [
-      ...current,
-      {
-        id: `MAT-${padded}`,
+    try {
+      const newMaterial = await createRawMaterialStock({
         material: formValues.material,
         category: formValues.category,
-        currentStock: `${currentStockNumber} ${formValues.unit}`,
-        minStock: `${minimumStockNumber} ${formValues.unit}`,
-        unitCost: `৳${unitCostNumber}`,
-        totalValue: `৳${totalValueNumber.toLocaleString("en-US")}`,
-        status: currentStockNumber < minimumStockNumber ? "Low Stock" : "Normal",
-      },
-    ]);
+        currentStock: formValues.currentStock,
+        minimumStock: formValues.minimumStock,
+        unitCost: formValues.unitCost,
+      });
 
-    closeAddMaterialModal();
+      setMaterials((current) => [...current, newMaterial]);
+      closeAddMaterialModal();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -248,6 +248,8 @@ export function RawMaterialStockPage() {
           </button>
         </div>
       </div>
+
+      {errorMessage ? <div className="rounded-md border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[14px] text-[#f7c8cf]">{errorMessage}</div> : null}
 
       <section className="grid grid-cols-1 gap-3 xl:grid-cols-3">
         <article className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
@@ -302,25 +304,25 @@ export function RawMaterialStockPage() {
             />
           </label>
 
-          <button
-            className="flex h-11 items-center justify-between rounded-md border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-4 text-[12px] text-[var(--app-text)]"
-            onClick={() => setDateFrom("23-04-2024")}
-            type="button"
-          >
-            <span>{dateFrom}</span>
-            <ChevronRightIcon />
-          </button>
+          <label className="flex h-11 items-center justify-between rounded-md border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-4 text-[12px] text-[var(--app-text)]">
+            <input
+              className="w-full bg-transparent text-[12px] text-[var(--app-text)] outline-none"
+              onChange={(event) => setDateFrom(event.target.value)}
+              type="date"
+              value={dateFrom}
+            />
+          </label>
 
           <div className="flex items-center justify-center text-[12px] text-[var(--app-text-muted)]">to</div>
 
-          <button
-            className="flex h-11 items-center justify-between rounded-md border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-4 text-[12px] text-[var(--app-text)]"
-            onClick={() => setDateTo("23-04-2024")}
-            type="button"
-          >
-            <span>{dateTo}</span>
-            <ChevronRightIcon />
-          </button>
+          <label className="flex h-11 items-center justify-between rounded-md border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-4 text-[12px] text-[var(--app-text)]">
+            <input
+              className="w-full bg-transparent text-[12px] text-[var(--app-text)] outline-none"
+              onChange={(event) => setDateTo(event.target.value)}
+              type="date"
+              value={dateTo}
+            />
+          </label>
         </div>
 
         <div className="mt-4 overflow-x-auto">
@@ -338,7 +340,13 @@ export function RawMaterialStockPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredMaterials.map((material) => (
+              {materialsLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[var(--app-text-soft)]" colSpan={8}>
+                    Loading raw material stock...
+                  </td>
+                </tr>
+              ) : filteredMaterials.map((material) => (
                   <tr
                   className={[
                     "border-b border-[var(--app-border)] text-[13px] text-[var(--app-text)]",
@@ -350,7 +358,7 @@ export function RawMaterialStockPage() {
                   <td className="py-4 pr-3">{material.material}</td>
                   <td className="py-4 pr-3">{material.category}</td>
                   <td className="py-4">{material.currentStock}</td>
-                  <td className="py-4">{material.minStock}</td>
+                  <td className="py-4">{material.minimumStock}</td>
                   <td className="py-4">{material.unitCost}</td>
                   <td className="py-4 font-semibold text-[#2563eb]">{material.totalValue}</td>
                   <td className="py-4">
@@ -431,18 +439,6 @@ export function RawMaterialStockPage() {
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-[15px] text-[#d7deea]">Unit</span>
-                  <input
-                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#d6ddea] outline-none placeholder:text-[#77879d]"
-                    name="unit"
-                    onChange={handleFormChange}
-                    placeholder="kg, meters, liters, etc."
-                    type="text"
-                    value={formValues.unit}
-                  />
-                </label>
-
-                <label className="block">
                   <span className="mb-2 block text-[15px] text-[#d7deea]">Unit Cost (৳)</span>
                   <input
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#d6ddea] outline-none"
@@ -464,6 +460,7 @@ export function RawMaterialStockPage() {
                 </button>
                 <button
                   className="inline-flex h-10 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                  disabled={isSubmitting}
                   type="submit"
                 >
                   Add Material

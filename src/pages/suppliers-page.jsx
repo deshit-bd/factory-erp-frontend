@@ -8,7 +8,6 @@ const initialSuppliers = [
     email: "contact@metalsup.com",
     phone: "+1-555-0100",
     rating: "4.5",
-    paymentTerms: "Net 30",
     receipt: "Supplier Profile.pdf",
   },
   {
@@ -18,7 +17,6 @@ const initialSuppliers = [
     email: "sales@indmat.com",
     phone: "+1-555-0101",
     rating: "4.2",
-    paymentTerms: "Net 45",
     receipt: "Registration.pdf",
   },
 ];
@@ -133,7 +131,7 @@ export function SuppliersPage() {
   });
 
   function handleExport() {
-    const header = ["ID", "Name", "Category", "Email", "Phone", "Rating", "Payment Terms", "Receipt"];
+    const header = ["ID", "Name", "Category", "Email", "Phone", "Rating", "Receipt"];
     const rows = suppliers.map((supplier) => [
       supplier.id,
       supplier.name,
@@ -141,7 +139,6 @@ export function SuppliersPage() {
       supplier.email,
       supplier.phone,
       supplier.rating,
-      supplier.paymentTerms,
       supplier.receipt,
     ]);
     const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
@@ -224,7 +221,6 @@ export function SuppliersPage() {
           email: formValues.email,
           phone: formValues.phone,
           rating: "4.0",
-          paymentTerms: "Net 30",
           receipt: "No receipt",
         },
       ]);
@@ -313,7 +309,6 @@ export function SuppliersPage() {
                 <th className="w-[17%] pb-3 font-medium">Email</th>
                 <th className="w-[12%] pb-3 font-medium">Phone</th>
                 <th className="w-[7%] pb-3 font-medium">Rating</th>
-                <th className="w-[14%] pb-3 font-medium">Payment Terms</th>
                 <th className="w-[8%] pb-3 font-medium">Receipt</th>
                 <th className="w-[9%] pb-3 text-right font-medium">Actions</th>
               </tr>
@@ -332,7 +327,6 @@ export function SuppliersPage() {
                       <span className="text-[#d7deea]">{supplier.rating}</span>
                     </span>
                   </td>
-                  <td className="py-4 text-[#d7deea]">{supplier.paymentTerms}</td>
                   <td className="py-4">
                     <button
                       className="text-[13px] font-medium text-[#f7a614] transition hover:text-[#ffc550]"

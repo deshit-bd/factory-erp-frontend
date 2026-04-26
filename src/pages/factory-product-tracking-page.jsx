@@ -1,16 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialEntries = [
-  {
-    id: "FP-001",
-    date: "2026-04-15",
-    projectId: "PRJ-001",
-    productName: "Industrial Valves",
-    quantityProduced: "100",
-    qualityStatus: "Pass",
-    remarks: "Good quality",
-  },
-];
+import {
+  createFactoryProductEntry,
+  getFactoryProductEntries,
+  updateFactoryProductEntry,
+} from "@/shared/lib/factory-product-tracking-api";
+import { getProjects } from "@/shared/lib/project-api";
 
 function DownloadIcon() {
   return (
@@ -52,8 +47,21 @@ function CloseIcon() {
   );
 }
 
+function ChevronDownIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 export function FactoryProductTrackingPage() {
-  const [entries, setEntries] = useState(initialEntries);
+  const [entries, setEntries] = useState([]);
+  const [entriesLoading, setEntriesLoading] = useState(true);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formValues, setFormValues] = useState({
@@ -64,6 +72,54 @@ export function FactoryProductTrackingPage() {
     remarks: "",
     date: "",
   });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadEntries() {
+      try {
+        const records = await getFactoryProductEntries();
+
+        if (isMounted) {
+          setEntries(records);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setEntriesLoading(false);
+        }
+      }
+    }
+
+    async function loadProjects() {
+      try {
+        const projects = await getProjects();
+
+        if (isMounted) {
+          setProjectOptions(projects);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+          setProjectOptions([]);
+        }
+      } finally {
+        if (isMounted) {
+          setProjectsLoading(false);
+        }
+      }
+    }
+
+    loadEntries();
+    loadProjects();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function handleExport() {
     const header = ["ID", "Date", "Project ID", "Product Name", "Quantity Produced", "Quality Status", "Remarks"];
@@ -87,6 +143,7 @@ export function FactoryProductTrackingPage() {
   }
 
   function openAddModal() {
+    setErrorMessage("");
     setEditingId(null);
     setFormValues({
       project: "",
@@ -100,9 +157,10 @@ export function FactoryProductTrackingPage() {
   }
 
   function openEditModal(entry) {
-    setEditingId(entry.id);
+    setErrorMessage("");
+    setEditingId(entry.recordId);
     setFormValues({
-      project: entry.projectId,
+      project: String(entry.projectRecordId),
       productName: entry.productName,
       quantityProduced: entry.quantityProduced,
       qualityStatus: entry.qualityStatus,
@@ -127,47 +185,49 @@ export function FactoryProductTrackingPage() {
 
   function handleFormChange(event) {
     const { name, value } = event.target;
+
+    if (name === "project") {
+      const selectedProject = projectOptions.find((project) => String(project.recordId) === value);
+
+      setFormValues((current) => ({
+        ...current,
+        project: value,
+        productName: selectedProject?.name || "",
+      }));
+      return;
+    }
+
     setFormValues((current) => ({ ...current, [name]: value }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage("");
 
-    if (editingId) {
-      setEntries((current) =>
-        current.map((entry) =>
-          entry.id === editingId
-            ? {
-                ...entry,
-                projectId: formValues.project,
-                productName: formValues.productName,
-                quantityProduced: formValues.quantityProduced,
-                qualityStatus: formValues.qualityStatus,
-                remarks: formValues.remarks,
-                date: formValues.date,
-              }
-            : entry,
-        ),
-      );
-    } else {
-      const nextNumber = entries.length + 1;
-      const padded = String(nextNumber).padStart(3, "0");
+    const payload = {
+      date: formValues.date,
+      projectId: formValues.project,
+      quantityProduced: formValues.quantityProduced,
+      qualityStatus: formValues.qualityStatus,
+      remarks: formValues.remarks,
+    };
 
-      setEntries((current) => [
-        ...current,
-        {
-          id: `FP-${padded}`,
-          date: formValues.date,
-          projectId: formValues.project,
-          productName: formValues.productName,
-          quantityProduced: formValues.quantityProduced,
-          qualityStatus: formValues.qualityStatus,
-          remarks: formValues.remarks,
-        },
-      ]);
+    try {
+      if (editingId) {
+        const updatedEntry = await updateFactoryProductEntry(editingId, payload);
+        setEntries((current) => current.map((entry) => (entry.recordId === editingId ? updatedEntry : entry)));
+      } else {
+        const newEntry = await createFactoryProductEntry(payload);
+        setEntries((current) => [newEntry, ...current]);
+      }
+
+      closeModal();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    closeModal();
   }
 
   return (
@@ -198,6 +258,10 @@ export function FactoryProductTrackingPage() {
         </div>
       </div>
 
+      {errorMessage ? (
+        <div className="rounded-md border border-[#7f3a3a] bg-[#3a2227] px-4 py-3 text-[14px] text-[#ffd7d7]">{errorMessage}</div>
+      ) : null}
+
       <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
@@ -214,28 +278,42 @@ export function FactoryProductTrackingPage() {
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry) => (
-                <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={entry.id}>
-                  <td className="py-4 font-semibold text-[#f7a614]">{entry.id}</td>
-                  <td className="py-4 text-[#98a5bb]">{entry.date}</td>
-                  <td className="py-4">{entry.projectId}</td>
-                  <td className="py-4 pr-3">{entry.productName}</td>
-                  <td className="py-4">{entry.quantityProduced}</td>
-                  <td className="py-4">
-                    <span className="inline-flex rounded-sm bg-[#57411f] px-2 py-1 text-[11px] font-medium text-[#f5b14e]">
-                      {entry.qualityStatus}
-                    </span>
-                  </td>
-                  <td className="py-4 pr-3 text-[#aeb8c9]">{entry.remarks}</td>
-                  <td className="py-4">
-                    <div className="flex justify-end">
-                      <button className="text-[#d7deea] transition hover:text-white" onClick={() => openEditModal(entry)} type="button">
-                        <EditIcon />
-                      </button>
-                    </div>
+              {entriesLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={8}>
+                    Loading factory product entries...
                   </td>
                 </tr>
-              ))}
+              ) : entries.length > 0 ? (
+                entries.map((entry) => (
+                  <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={entry.recordId}>
+                    <td className="py-4 font-semibold text-[#f7a614]">{entry.id}</td>
+                    <td className="py-4 text-[#98a5bb]">{entry.date}</td>
+                    <td className="py-4">{entry.projectId}</td>
+                    <td className="py-4 pr-3">{entry.productName}</td>
+                    <td className="py-4">{entry.quantityProduced}</td>
+                    <td className="py-4">
+                      <span className="inline-flex rounded-sm bg-[#57411f] px-2 py-1 text-[11px] font-medium text-[#f5b14e]">
+                        {entry.qualityStatus}
+                      </span>
+                    </td>
+                    <td className="py-4 pr-3 text-[#aeb8c9]">{entry.remarks}</td>
+                    <td className="py-4">
+                      <div className="flex justify-end">
+                        <button className="text-[#d7deea] transition hover:text-white" onClick={() => openEditModal(entry)} type="button">
+                          <EditIcon />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={8}>
+                    No factory product entries found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -257,14 +335,28 @@ export function FactoryProductTrackingPage() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="block space-y-2">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Project *</span>
-                  <input
-                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
-                    name="project"
-                    onChange={handleFormChange}
-                    required
-                    type="text"
-                    value={formValues.project}
-                  />
+                  <div className="relative">
+                    <select
+                      className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 pr-11 text-[14px] text-[#e6ebf4] outline-none"
+                      disabled={projectsLoading}
+                      name="project"
+                      onChange={handleFormChange}
+                      required
+                      value={formValues.project}
+                    >
+                      <option disabled value="">
+                        {projectsLoading ? "Loading projects..." : "Select project"}
+                      </option>
+                      {projectOptions.map((project) => (
+                        <option key={project.recordId} value={project.recordId}>
+                          {project.id} - {project.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[#97a5bc]">
+                      <ChevronDownIcon />
+                    </span>
+                  </div>
                 </label>
 
                 <label className="block space-y-2">
@@ -295,14 +387,24 @@ export function FactoryProductTrackingPage() {
 
                 <label className="block space-y-2">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Quality Status *</span>
-                  <input
-                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
-                    name="qualityStatus"
-                    onChange={handleFormChange}
-                    required
-                    type="text"
-                    value={formValues.qualityStatus}
-                  />
+                  <div className="relative">
+                    <select
+                      className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 pr-11 text-[14px] text-[#e6ebf4] outline-none"
+                      name="qualityStatus"
+                      onChange={handleFormChange}
+                      required
+                      value={formValues.qualityStatus}
+                    >
+                      <option disabled value="">
+                        Select status
+                      </option>
+                      <option value="Pass">Pass</option>
+                      <option value="Fail">Fail</option>
+                    </select>
+                    <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[#97a5bc]">
+                      <ChevronDownIcon />
+                    </span>
+                  </div>
                 </label>
 
                 <label className="block space-y-2">
@@ -323,7 +425,7 @@ export function FactoryProductTrackingPage() {
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
                     name="date"
                     onChange={handleFormChange}
-                    type="text"
+                    type="date"
                     value={formValues.date}
                   />
                 </label>
@@ -338,10 +440,11 @@ export function FactoryProductTrackingPage() {
                   Cancel
                 </button>
                 <button
+                  disabled={isSubmitting}
                   className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
                   type="submit"
                 >
-                  {editingId ? "Save Entry" : "Add Entry"}
+                  {isSubmitting ? "Saving..." : editingId ? "Save Entry" : "Add Entry"}
                 </button>
               </div>
             </form>

@@ -1,14 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialAllocations = [
-  {
-    id: "ALL-001",
-    project: "PRJ-001",
-    material: "Steel Rods",
-    quantity: "200",
-    date: "2026-04-12",
-  },
-];
+import { getProjects } from "@/shared/lib/project-api";
+import { createRawMaterialAllocation, getRawMaterialAllocations } from "@/shared/lib/raw-material-allocation-api";
+import { getRawMaterialStocks } from "@/shared/lib/raw-material-stock-api";
 
 function PlusIcon() {
   return (
@@ -26,25 +20,109 @@ function CloseIcon() {
   );
 }
 
+function ChevronDownIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 export function MaterialAllocationPage() {
-  const [allocations, setAllocations] = useState(initialAllocations);
+  const [allocations, setAllocations] = useState([]);
+  const [allocationsLoading, setAllocationsLoading] = useState(true);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [materialOptions, setMaterialOptions] = useState([]);
+  const [materialsLoading, setMaterialsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
   const [formValues, setFormValues] = useState({
-    project: "",
-    material: "",
+    projectId: "",
+    rawMaterialId: "",
     quantity: "",
     date: "",
   });
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAllocations() {
+      try {
+        const records = await getRawMaterialAllocations();
+
+        if (isMounted) {
+          setAllocations(records);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setAllocationsLoading(false);
+        }
+      }
+    }
+
+    async function loadProjects() {
+      try {
+        const projects = await getProjects();
+
+        if (isMounted) {
+          setProjectOptions(projects);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+          setProjectOptions([]);
+        }
+      } finally {
+        if (isMounted) {
+          setProjectsLoading(false);
+        }
+      }
+    }
+
+    async function loadMaterials() {
+      try {
+        const materials = await getRawMaterialStocks();
+
+        if (isMounted) {
+          setMaterialOptions(materials);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+          setMaterialOptions([]);
+        }
+      } finally {
+        if (isMounted) {
+          setMaterialsLoading(false);
+        }
+      }
+    }
+
+    loadAllocations();
+    loadProjects();
+    loadMaterials();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   function openAllocateModal() {
+    setErrorMessage("");
     setIsAllocateModalOpen(true);
   }
 
   function closeAllocateModal() {
     setIsAllocateModalOpen(false);
     setFormValues({
-      project: "",
-      material: "",
+      projectId: "",
+      rawMaterialId: "",
       quantity: "",
       date: "",
     });
@@ -55,23 +133,28 @@ export function MaterialAllocationPage() {
     setFormValues((current) => ({ ...current, [name]: value }));
   }
 
-  function handleAllocate(event) {
+  async function handleAllocate(event) {
     event.preventDefault();
-    const nextNumber = allocations.length + 1;
-    const padded = String(nextNumber).padStart(3, "0");
+    setIsSubmitting(true);
+    setErrorMessage("");
 
-    setAllocations((current) => [
-      ...current,
-      {
-        id: `ALL-${padded}`,
-        project: formValues.project,
-        material: formValues.material,
+    try {
+      const newAllocation = await createRawMaterialAllocation({
+        projectId: formValues.projectId,
+        rawMaterialId: formValues.rawMaterialId,
         quantity: formValues.quantity,
         date: formValues.date,
-      },
-    ]);
+      });
 
-    closeAllocateModal();
+      setAllocations((current) => [newAllocation, ...current]);
+      const materials = await getRawMaterialStocks();
+      setMaterialOptions(materials);
+      closeAllocateModal();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -94,6 +177,10 @@ export function MaterialAllocationPage() {
         </div>
       </div>
 
+      {errorMessage ? (
+        <div className="rounded-md border border-[#7f3a3a] bg-[#3a2227] px-4 py-3 text-[14px] text-[#ffd7d7]">{errorMessage}</div>
+      ) : null}
+
       <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
@@ -107,15 +194,32 @@ export function MaterialAllocationPage() {
               </tr>
             </thead>
             <tbody>
-              {allocations.map((allocation) => (
-                <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={allocation.id}>
-                  <td className="py-4 font-semibold text-[#f7a614]">{allocation.id}</td>
-                  <td className="py-4">{allocation.project}</td>
-                  <td className="py-4">{allocation.material}</td>
-                  <td className="py-4">{allocation.quantity}</td>
-                  <td className="py-4 text-[#98a5bb]">{allocation.date}</td>
+              {allocationsLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={5}>
+                    Loading allocations...
+                  </td>
                 </tr>
-              ))}
+              ) : allocations.length > 0 ? (
+                allocations.map((allocation) => (
+                  <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={allocation.recordId}>
+                    <td className="py-4 font-semibold text-[#f7a614]">{allocation.id}</td>
+                    <td className="py-4">
+                      <div className="font-medium text-[#e6ebf4]">{allocation.project}</div>
+                      {allocation.projectName ? <div className="mt-1 text-[12px] text-[#98a5bb]">{allocation.projectName}</div> : null}
+                    </td>
+                    <td className="py-4">{allocation.material}</td>
+                    <td className="py-4">{allocation.quantity}</td>
+                    <td className="py-4 text-[#98a5bb]">{allocation.date}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={5}>
+                    No material allocations found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -134,26 +238,54 @@ export function MaterialAllocationPage() {
             <form className="space-y-4 px-4 py-4" onSubmit={handleAllocate}>
               <label className="block space-y-2">
                 <span className="text-[14px] font-medium text-[#d6ddea]">Project *</span>
-                <input
-                  className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
-                  name="project"
-                  onChange={handleFormChange}
-                  required
-                  type="text"
-                  value={formValues.project}
-                />
+                <div className="relative">
+                  <select
+                    className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 pr-11 text-[14px] text-[#e6ebf4] outline-none"
+                    disabled={projectsLoading}
+                    name="projectId"
+                    onChange={handleFormChange}
+                    required
+                    value={formValues.projectId}
+                  >
+                    <option disabled value="">
+                      {projectsLoading ? "Loading projects..." : "Select project"}
+                    </option>
+                    {projectOptions.map((project) => (
+                      <option key={project.recordId} value={project.recordId}>
+                        {project.id} - {project.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[#97a5bc]">
+                    <ChevronDownIcon />
+                  </span>
+                </div>
               </label>
 
               <label className="block space-y-2">
                 <span className="text-[14px] font-medium text-[#d6ddea]">Material *</span>
-                <input
-                  className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
-                  name="material"
-                  onChange={handleFormChange}
-                  required
-                  type="text"
-                  value={formValues.material}
-                />
+                <div className="relative">
+                  <select
+                    className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 pr-11 text-[14px] text-[#e6ebf4] outline-none"
+                    disabled={materialsLoading}
+                    name="rawMaterialId"
+                    onChange={handleFormChange}
+                    required
+                    value={formValues.rawMaterialId}
+                  >
+                    <option disabled value="">
+                      {materialsLoading ? "Loading materials..." : "Select material"}
+                    </option>
+                    {materialOptions.map((material) => (
+                      <option key={material.recordId} value={material.recordId}>
+                        {material.material} - Stock: {material.currentStock}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[#97a5bc]">
+                    <ChevronDownIcon />
+                  </span>
+                </div>
               </label>
 
               <label className="block space-y-2">
@@ -163,6 +295,7 @@ export function MaterialAllocationPage() {
                   name="quantity"
                   onChange={handleFormChange}
                   required
+                  min="1"
                   type="number"
                   value={formValues.quantity}
                 />
@@ -175,7 +308,7 @@ export function MaterialAllocationPage() {
                   name="date"
                   onChange={handleFormChange}
                   required
-                  type="text"
+                  type="date"
                   value={formValues.date}
                 />
               </label>
@@ -185,10 +318,11 @@ export function MaterialAllocationPage() {
                   Cancel
                 </button>
                 <button
-                  className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                  className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isSubmitting}
                   type="submit"
                 >
-                  Allocate
+                  {isSubmitting ? "Allocating..." : "Allocate"}
                 </button>
               </div>
             </form>
