@@ -1,27 +1,73 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialGoods = [
-  {
-    id: "FG-001",
-    product: "Industrial Valves",
-    project: "PRJ-001",
-    supplierProduction: "150",
-    factoryProduction: "300",
-    totalProduction: "450",
-    netProduction: "450",
-    status: "Complete",
-  },
-  {
-    id: "FG-002",
-    product: "Steels",
-    project: "PRJ-002",
-    supplierProduction: "300",
-    factoryProduction: "200",
-    totalProduction: "500",
-    netProduction: "600",
-    status: "Pending",
-  },
-];
+import { getFactoryProductEntries } from "@/shared/lib/factory-product-tracking-api";
+import { getSupplierProductsTracking } from "@/shared/lib/supplier-products-tracking-api";
+
+function toQuantity(value) {
+  const quantity = Number(value);
+  return Number.isFinite(quantity) ? quantity : 0;
+}
+
+function isPassed(status) {
+  return String(status || "").toLowerCase() === "pass";
+}
+
+function createFinishedGoodKey(projectRecordId, projectId, product) {
+  return [projectRecordId || projectId || "project", String(product || "").trim().toLowerCase()].join("::");
+}
+
+function createFinishedGoods(supplierEntries, factoryEntries) {
+  const goodsByKey = new Map();
+
+  function getGood({ projectRecordId, projectId, product }) {
+    const key = createFinishedGoodKey(projectRecordId, projectId, product);
+
+    if (!goodsByKey.has(key)) {
+      goodsByKey.set(key, {
+        product: product || "Unknown Product",
+        project: projectId || "Unknown Project",
+        supplierProduction: 0,
+        factoryProduction: 0,
+      });
+    }
+
+    return goodsByKey.get(key);
+  }
+
+  supplierEntries.filter((entry) => isPassed(entry.qualityStatus)).forEach((entry) => {
+    const good = getGood({
+      projectRecordId: entry.projectRecordId,
+      projectId: entry.projectId,
+      product: entry.product,
+    });
+
+    good.supplierProduction += toQuantity(entry.quantitySupplied);
+  });
+
+  factoryEntries.filter((entry) => isPassed(entry.qualityStatus)).forEach((entry) => {
+    const good = getGood({
+      projectRecordId: entry.projectRecordId,
+      projectId: entry.projectId,
+      product: entry.productName,
+    });
+
+    good.factoryProduction += toQuantity(entry.quantityProduced);
+  });
+
+  return Array.from(goodsByKey.values()).map((item, index) => {
+    const totalProduction = item.supplierProduction + item.factoryProduction;
+
+    return {
+      ...item,
+      id: `FG-${String(index + 1).padStart(3, "0")}`,
+      supplierProduction: String(item.supplierProduction),
+      factoryProduction: String(item.factoryProduction),
+      totalProduction: String(totalProduction),
+      netProduction: String(totalProduction),
+      status: totalProduction > 0 ? "Complete" : "Pending",
+    };
+  });
+}
 
 function SearchIcon() {
   return (
@@ -49,7 +95,40 @@ function DownloadIcon() {
 
 export function FinishedGoodsPage() {
   const [search, setSearch] = useState("");
-  const [goods] = useState(initialGoods);
+  const [goods, setGoods] = useState([]);
+  const [goodsLoading, setGoodsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFinishedGoods() {
+      try {
+        const [supplierEntries, factoryEntries] = await Promise.all([
+          getSupplierProductsTracking(),
+          getFactoryProductEntries(),
+        ]);
+
+        if (isMounted) {
+          setGoods(createFinishedGoods(supplierEntries, factoryEntries));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setGoodsLoading(false);
+        }
+      }
+    }
+
+    loadFinishedGoods();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredGoods = goods.filter((item) => {
     const query = search.toLowerCase();
@@ -61,7 +140,7 @@ export function FinishedGoodsPage() {
     );
   });
 
-  const totalProjects = goods.length;
+  const totalProjects = new Set(goods.map((item) => item.project)).size;
   const inStock = goods.filter((item) => item.status === "Complete").length;
 
   function handleExport() {
@@ -117,6 +196,10 @@ export function FinishedGoodsPage() {
         </div>
       </div>
 
+      {errorMessage ? (
+        <div className="rounded-md border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[14px] text-[#f7c8cf]">{errorMessage}</div>
+      ) : null}
+
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <article className="rounded-md border border-[#314058] bg-[#222d40] px-5 py-5">
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">Total Project</div>
@@ -156,27 +239,41 @@ export function FinishedGoodsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredGoods.map((item) => (
-                <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={item.id}>
-                  <td className="py-4 font-semibold text-[#f7a614]">{item.id}</td>
-                  <td className="py-4 pr-3">{item.product}</td>
-                  <td className="py-4">{item.project}</td>
-                  <td className="py-4">{item.supplierProduction}</td>
-                  <td className="py-4">{item.factoryProduction}</td>
-                  <td className="py-4 font-semibold text-[#f7a614]">{item.totalProduction}</td>
-                  <td className="py-4 font-semibold text-[#f7a614]">{item.netProduction}</td>
-                  <td className="py-4 text-right">
-                    <span
-                      className={[
-                        "inline-flex rounded-sm px-2 py-1 text-[11px] font-medium",
-                        item.status === "Complete" ? "bg-transparent text-[#f7a614]" : "bg-transparent text-[#d7deea]",
-                      ].join(" ")}
-                    >
-                      {item.status}
-                    </span>
+              {goodsLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={8}>
+                    Loading finished goods...
                   </td>
                 </tr>
-              ))}
+              ) : filteredGoods.length > 0 ? (
+                filteredGoods.map((item) => (
+                  <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={item.id}>
+                    <td className="py-4 font-semibold text-[#f7a614]">{item.id}</td>
+                    <td className="py-4 pr-3">{item.product}</td>
+                    <td className="py-4">{item.project}</td>
+                    <td className="py-4">{item.supplierProduction}</td>
+                    <td className="py-4">{item.factoryProduction}</td>
+                    <td className="py-4 font-semibold text-[#f7a614]">{item.totalProduction}</td>
+                    <td className="py-4 font-semibold text-[#f7a614]">{item.netProduction}</td>
+                    <td className="py-4 text-right">
+                      <span
+                        className={[
+                          "inline-flex rounded-sm px-2 py-1 text-[11px] font-medium",
+                          item.status === "Complete" ? "bg-transparent text-[#f7a614]" : "bg-transparent text-[#d7deea]",
+                        ].join(" ")}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={8}>
+                    No quality passed finished goods found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

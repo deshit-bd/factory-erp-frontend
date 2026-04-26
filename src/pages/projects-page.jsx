@@ -51,7 +51,29 @@ function formatProjectDate(value) {
 }
 
 function getProjectStatusClasses(status) {
-  return status === "Completed" ? "bg-[#1f4f3c] text-[#68d8a3]" : "bg-[#1d3b63] text-[#69a7ff]";
+  if (status === "Completed") {
+    return "bg-[#1f4f3c] text-[#68d8a3]";
+  }
+
+  if (status === "Confirmed") {
+    return "bg-[#57411f] text-[#f5b14e]";
+  }
+
+  return "bg-[#1d3b63] text-[#69a7ff]";
+}
+
+function getProgressValue(progress) {
+  const value = Number(progress);
+
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(Math.max(value, 0), 100);
+}
+
+function getProgressBarClasses(status) {
+  return status === "Completed" ? "bg-[#22c55e]" : "bg-[#f7a614]";
 }
 
 export function ProjectsPage() {
@@ -98,16 +120,19 @@ export function ProjectsPage() {
     return (
       project.id.toLowerCase().includes(query) ||
       project.name.toLowerCase().includes(query) ||
+      project.product.toLowerCase().includes(query) ||
+      project.totalOrderQuantity.toLowerCase().includes(query) ||
       project.buyer.toLowerCase().includes(query) ||
       project.status.toLowerCase().includes(query)
     );
   });
 
   function handleExport() {
-    const header = ["Project ID", "Name", "Buyer", "Start Date", "Delivery Date", "Status", "Progress"];
+    const header = ["Project ID", "Product", "Quantity", "Buyer", "Start Date", "Delivery Date", "Status", "Progress"];
     const rows = projects.map((project) => [
       project.id,
-      project.name,
+      project.product,
+      project.totalOrderQuantity,
       project.buyer,
       formatProjectDate(project.startDate),
       formatProjectDate(project.deliveryDate),
@@ -184,65 +209,74 @@ export function ProjectsPage() {
             />
           </label>
 
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full border-collapse text-left">
+          <div className="mt-4 overflow-hidden">
+            <table className="w-full table-fixed border-collapse text-left">
               <thead>
                 <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
-                  <th className="pb-3 pr-6 font-medium">Project ID</th>
-                  <th className="pb-3 pr-6 font-medium">Name</th>
-                  <th className="pb-3 pr-6 font-medium">Buyer</th>
-                  <th className="pb-3 pr-6 font-medium">Start Date</th>
-                  <th className="pb-3 pr-6 font-medium">Delivery Date</th>
-                  <th className="pb-3 pr-6 font-medium">Status</th>
-                  <th className="pb-3 font-medium">Progress</th>
+                  <th className="w-[13%] pb-3 pr-4 font-medium">Project ID</th>
+                  <th className="w-[16%] pb-3 pr-4 font-medium">Product</th>
+                  <th className="w-[9%] pb-3 pr-4 font-medium">Quantity</th>
+                  <th className="w-[13%] pb-3 pr-4 font-medium">Buyer</th>
+                  <th className="w-[13%] pb-3 pr-4 font-medium">Start Date</th>
+                  <th className="w-[14%] pb-3 pr-4 font-medium">Delivery Date</th>
+                  <th className="w-[10%] pb-3 pr-4 font-medium">Status</th>
+                  <th className="w-[12%] pb-3 font-medium">Progress</th>
                 </tr>
               </thead>
               <tbody>
                 {projectsLoading ? (
                   <tr>
-                    <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={7}>
+                    <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={8}>
                       Loading projects...
                     </td>
                   </tr>
                 ) : filteredProjects.length === 0 ? (
                   <tr>
-                    <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={7}>
+                    <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={8}>
                       No projects found.
                     </td>
                   </tr>
                 ) : (
-                  filteredProjects.map((project) => (
-                    <tr
-                      className={[
-                        "cursor-pointer border-b border-[#2d394d] text-[13px] text-[#d7deea] transition",
-                        selectedProject?.id === project.id && isDetailsOpen ? "bg-[#1b2434]" : "hover:bg-[#263248]/35",
-                      ].join(" ")}
-                      key={project.id}
-                      onClick={() => {
-                        setSelectedProject(project);
-                        setIsDetailsOpen(true);
-                      }}
-                    >
-                      <td className="py-4 font-semibold text-[#f7a614]">{project.id}</td>
-                      <td className="py-4 pr-3">{project.name}</td>
-                      <td className="py-4 pr-3">{project.buyer}</td>
-                      <td className="py-4 text-[#98a5bb]">{formatProjectDate(project.startDate)}</td>
-                      <td className="py-4 text-[#98a5bb]">{formatProjectDate(project.deliveryDate)}</td>
-                      <td className="py-4">
-                        <span className={["inline-flex rounded-sm px-2 py-1 text-[11px] font-medium", getProjectStatusClasses(project.status)].join(" ")}>
-                          {project.status}
-                        </span>
-                      </td>
-                      <td className="py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-1.5 w-14 rounded-full bg-[#dbeafe]">
-                            <div className="h-1.5 rounded-full bg-[#2563eb]" style={{ width: `${project.progress}%` }} />
+                  filteredProjects.map((project) => {
+                    const progress = getProgressValue(project.progress);
+
+                    return (
+                      <tr
+                        className={[
+                          "cursor-pointer border-b border-[#2d394d] text-[13px] text-[#d7deea] transition",
+                          selectedProject?.id === project.id && isDetailsOpen ? "bg-[#1b2434]" : "hover:bg-[#263248]/35",
+                        ].join(" ")}
+                        key={project.id}
+                        onClick={() => {
+                          setSelectedProject(project);
+                          setIsDetailsOpen(true);
+                        }}
+                      >
+                        <td className="truncate py-4 pr-4 font-semibold text-[#f7a614]">{project.id}</td>
+                        <td className="truncate py-4 pr-4">{project.product}</td>
+                        <td className="py-4 pr-4">{project.totalOrderQuantity}</td>
+                        <td className="truncate py-4 pr-4">{project.buyer}</td>
+                        <td className="py-4 pr-4 text-[#98a5bb]">{formatProjectDate(project.startDate)}</td>
+                        <td className="py-4 pr-4 text-[#98a5bb]">{formatProjectDate(project.deliveryDate)}</td>
+                        <td className="py-4 pr-4">
+                          <span className={["inline-flex rounded-sm px-2 py-1 text-[11px] font-medium", getProjectStatusClasses(project.status)].join(" ")}>
+                            {project.status}
+                          </span>
+                        </td>
+                        <td className="py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 flex-1 rounded-full bg-[#3a465b]">
+                              <div
+                                className={["h-2 rounded-full", getProgressBarClasses(project.status)].join(" ")}
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <span className="w-8 text-right text-[11px] font-medium text-[#d7deea]">{progress}%</span>
                           </div>
-                          <span className="text-[11px] text-[#64748b]">{project.progress}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -269,8 +303,13 @@ export function ProjectsPage() {
               </div>
 
               <div>
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">Name</div>
-                <div className="mt-2 text-[13px] text-[#d7deea]">{selectedProject.name}</div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">Product</div>
+                <div className="mt-2 text-[13px] text-[#d7deea]">{selectedProject.product}</div>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">Quantity</div>
+                <div className="mt-2 text-[13px] text-[#d7deea]">{selectedProject.totalOrderQuantity}</div>
               </div>
 
               <div>
@@ -291,9 +330,12 @@ export function ProjectsPage() {
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">Progress</div>
                 <div className="mt-3 flex items-center gap-3">
                   <div className="h-1.5 flex-1 rounded-full bg-[#3a465b]">
-                    <div className="h-1.5 rounded-full bg-[#f7a614]" style={{ width: `${selectedProject.progress}%` }} />
+                    <div
+                      className={["h-1.5 rounded-full", getProgressBarClasses(selectedProject.status)].join(" ")}
+                      style={{ width: `${getProgressValue(selectedProject.progress)}%` }}
+                    />
                   </div>
-                  <span className="text-[11px] font-medium text-[#f7a614]">{selectedProject.progress}%</span>
+                  <span className="text-[11px] font-medium text-[#f7a614]">{getProgressValue(selectedProject.progress)}%</span>
                 </div>
               </div>
 

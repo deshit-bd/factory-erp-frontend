@@ -36,6 +36,14 @@ function PlusIcon() {
   );
 }
 
+function MinusIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path d="M5 12h14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 function ChevronRightIcon() {
   return (
     <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -99,6 +107,7 @@ export function MaterialPurchasePage() {
   const [isAddPurchaseModalOpen, setIsAddPurchaseModalOpen] = useState(false);
   const [isMaterialSuggestionsOpen, setIsMaterialSuggestionsOpen] = useState(false);
   const [receiptPreview, setReceiptPreview] = useState(null);
+  const [receiptZoom, setReceiptZoom] = useState(1);
   const [formValues, setFormValues] = useState({
     material: "",
     supplier: "",
@@ -185,6 +194,10 @@ export function MaterialPurchasePage() {
   const isNewMaterial = formValues.material.trim() && !matchingStockMaterial;
   const receiptPreviewUrl = receiptPreview?.receiptLocation ? getUploadUrl(receiptPreview.receiptLocation) : "";
   const isReceiptPreviewPdf = /\.pdf($|\?)/i.test(receiptPreviewUrl);
+  const receiptZoomStyle = {
+    transform: `scale(${receiptZoom})`,
+    transformOrigin: "top center",
+  };
 
   const filteredPurchases = purchases.filter((purchase) => {
     const query = search.toLowerCase();
@@ -245,11 +258,21 @@ export function MaterialPurchasePage() {
   }
 
   function openReceiptPreview(purchase) {
+    setReceiptZoom(1);
     setReceiptPreview(purchase);
   }
 
   function closeReceiptPreview() {
     setReceiptPreview(null);
+    setReceiptZoom(1);
+  }
+
+  function zoomReceiptIn() {
+    setReceiptZoom((current) => Math.min(current + 0.25, 2));
+  }
+
+  function zoomReceiptOut() {
+    setReceiptZoom((current) => Math.max(current - 0.25, 0.5));
   }
 
   function handleFormChange(event) {
@@ -650,20 +673,64 @@ export function MaterialPurchasePage() {
                   {receiptPreview.id} · {receiptPreview.material}
                 </p>
               </div>
-              <button className="text-[#d7deea] transition hover:text-white" onClick={closeReceiptPreview} type="button">
-                <CloseIcon />
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center overflow-hidden rounded-md border border-[#3c4b64] bg-[#182235]">
+                  <button
+                    aria-label="Zoom out receipt"
+                    className="flex h-9 w-9 items-center justify-center text-[#d7deea] transition hover:bg-[#26354b] hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+                    disabled={receiptZoom <= 0.5}
+                    onClick={zoomReceiptOut}
+                    title="Zoom out"
+                    type="button"
+                  >
+                    <MinusIcon />
+                  </button>
+                  <span className="min-w-14 border-x border-[#3c4b64] px-2 text-center text-[12px] font-medium text-[#d7deea]">
+                    {Math.round(receiptZoom * 100)}%
+                  </span>
+                  <button
+                    aria-label="Zoom in receipt"
+                    className="flex h-9 w-9 items-center justify-center text-[#d7deea] transition hover:bg-[#26354b] hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+                    disabled={receiptZoom >= 2}
+                    onClick={zoomReceiptIn}
+                    title="Zoom in"
+                    type="button"
+                  >
+                    <PlusIcon />
+                  </button>
+                </div>
+                <button className="text-[#d7deea] transition hover:text-white" onClick={closeReceiptPreview} type="button">
+                  <CloseIcon />
+                </button>
+              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto bg-[#182235] p-4">
               {isReceiptPreviewPdf ? (
-                <iframe className="h-[70vh] w-full rounded-md border border-[#314058] bg-white" src={receiptPreviewUrl} title="Purchase receipt" />
+                <div
+                  className="mx-auto w-full"
+                  style={{
+                    height: `${70 * receiptZoom}vh`,
+                    maxWidth: `${100 * receiptZoom}%`,
+                    width: `${100 * receiptZoom}%`,
+                  }}
+                >
+                  <iframe
+                    className="h-[70vh] w-full rounded-md border border-[#314058] bg-white"
+                    src={receiptPreviewUrl}
+                    style={receiptZoomStyle}
+                    title="Purchase receipt"
+                  />
+                </div>
               ) : (
-                <img
-                  alt="Purchase receipt"
-                  className="mx-auto max-h-[70vh] max-w-full rounded-md border border-[#314058] object-contain"
-                  src={receiptPreviewUrl}
-                />
+                <div className="flex justify-center">
+                  <img
+                    alt="Purchase receipt"
+                    className="max-h-[70vh] max-w-full rounded-md border border-[#314058] object-contain"
+                    src={receiptPreviewUrl}
+                    style={receiptZoomStyle}
+                  />
+                </div>
               )}
             </div>
           </div>

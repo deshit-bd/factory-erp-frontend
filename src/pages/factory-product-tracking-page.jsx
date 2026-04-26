@@ -55,6 +55,11 @@ function ChevronDownIcon() {
   );
 }
 
+function toQuantity(value) {
+  const quantity = Number(value);
+  return Number.isFinite(quantity) ? quantity : 0;
+}
+
 export function FactoryProductTrackingPage() {
   const [entries, setEntries] = useState([]);
   const [entriesLoading, setEntriesLoading] = useState(true);
@@ -120,6 +125,21 @@ export function FactoryProductTrackingPage() {
       isMounted = false;
     };
   }, []);
+
+  const selectedProject = projectOptions.find((project) => String(project.recordId) === formValues.project);
+  const enteredQuantity = toQuantity(formValues.quantityProduced);
+  const totalOrderQuantity = toQuantity(selectedProject?.totalOrderQuantity);
+  const supplierProduced = toQuantity(selectedProject?.totalSupplierProduced);
+  const factoryProducedExcludingCurrent = selectedProject
+    ? entries
+        .filter((entry) => entry.projectRecordId === selectedProject.recordId && entry.recordId !== editingId)
+        .reduce((total, entry) => total + toQuantity(entry.quantityProduced), 0)
+    : 0;
+  const remainingBeforeEntry = Math.max(totalOrderQuantity - supplierProduced - factoryProducedExcludingCurrent, 0);
+  const remainingAfterEntry = Math.max(remainingBeforeEntry - enteredQuantity, 0);
+  const hasProductionLimit = Boolean(selectedProject) && totalOrderQuantity > 0;
+  const isQuantityUnavailable = Boolean(selectedProject) && totalOrderQuantity <= 0;
+  const isQuantityOverLimit = hasProductionLimit && enteredQuantity > remainingBeforeEntry;
 
   function handleExport() {
     const header = ["ID", "Date", "Project ID", "Product Name", "Quantity Produced", "Quality Status", "Remarks"];
@@ -202,6 +222,17 @@ export function FactoryProductTrackingPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (isQuantityUnavailable) {
+      setErrorMessage("No ordered quantity found for this project.");
+      return;
+    }
+
+    if (isQuantityOverLimit) {
+      setErrorMessage(`Quantity produced cannot exceed remaining quantity (${remainingBeforeEntry}).`);
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage("");
 
@@ -375,7 +406,12 @@ export function FactoryProductTrackingPage() {
                 <label className="block space-y-2">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Quantity Produced *</span>
                   <input
-                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
+                    className={[
+                      "h-11 w-full rounded-md border bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]",
+                      isQuantityOverLimit ? "border-[#b94a4a]" : "border-[#334156]",
+                    ].join(" ")}
+                    max={hasProductionLimit ? remainingBeforeEntry : undefined}
+                    min="1"
                     name="quantityProduced"
                     onChange={handleFormChange}
                     placeholder="Enter quantity"
@@ -383,6 +419,17 @@ export function FactoryProductTrackingPage() {
                     type="number"
                     value={formValues.quantityProduced}
                   />
+                  <span className={["block text-[12px]", isQuantityOverLimit ? "text-[#ffb4b4]" : "text-[#9aa6bb]"].join(" ")}>
+                    {selectedProject
+                      ? isQuantityOverLimit
+                        ? `Only ${remainingBeforeEntry} remaining for this project.`
+                        : isQuantityUnavailable
+                          ? "No ordered quantity found for this project."
+                          : formValues.quantityProduced
+                            ? `${remainingAfterEntry} remaining after this entry.`
+                            : `${remainingBeforeEntry} remaining for this project.`
+                      : "Select a project to see remaining quantity."}
+                  </span>
                 </label>
 
                 <label className="block space-y-2">
@@ -440,8 +487,8 @@ export function FactoryProductTrackingPage() {
                   Cancel
                 </button>
                 <button
-                  disabled={isSubmitting}
-                  className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                  disabled={isSubmitting || isQuantityUnavailable || isQuantityOverLimit}
+                  className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733] disabled:cursor-not-allowed disabled:opacity-70"
                   type="submit"
                 >
                   {isSubmitting ? "Saving..." : editingId ? "Save Entry" : "Add Entry"}
