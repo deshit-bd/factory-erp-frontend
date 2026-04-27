@@ -12,11 +12,11 @@ import { MaterialAllocationPage } from "@/pages/material-allocation-page";
 import { MaterialPurchasePage } from "@/pages/material-purchase-page";
 import { ProjectsPage } from "@/pages/projects-page";
 import { RawMaterialSupplierPage } from "@/pages/raw-material-supplier-page";
+import { RawMaterialSupplierPaymentsPage } from "@/pages/raw-material-supplier-payments-page";
 import { RawMaterialStockPage } from "@/pages/raw-material-stock-page";
 import { SalesOrdersPage } from "@/pages/sales-orders-page";
 import { SettingsPage } from "@/pages/settings-page";
 import { SupplierAssignmentPage } from "@/pages/supplier-assignment-page";
-import { SupplierPaymentsPage } from "@/pages/supplier-payments-page";
 import { SupplierProductsTrackingPage } from "@/pages/supplier-products-tracking-page";
 import { SuppliersPage } from "@/pages/suppliers-page";
 
@@ -81,7 +81,7 @@ export function HomePage() {
         }
 
         if (selectedItem === "Supplier Payments" || selectedItem === "Raw Material Supplier Payment" || selectedItem === "Material Supplier Payment") {
-          return <SupplierPaymentsPage />;
+          return <RawMaterialSupplierPaymentsPage />;
         }
 
         if (selectedItem === "Goods Supplier Payment") {

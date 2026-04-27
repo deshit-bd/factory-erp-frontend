@@ -19,7 +19,7 @@ const permissionGroupTitles = {
   "Supplier Products Tracking": "Production",
   "Delivery/Shipment": "Production",
   "Delivery History": "Production",
-  "Supplier Payments": "Accounts",
+  "Raw Material Supplier Payment": "Accounts",
   Accounts: "Accounts",
   Settings: "System",
 };
@@ -57,7 +57,7 @@ const initialUsers = [
       "Projects",
       "Raw Material Supplier",
       "Project Goods Supplier",
-      "Supplier Payments",
+      "Raw Material Supplier Payment",
       "Invoices",
       "Accounts",
       "Settings",

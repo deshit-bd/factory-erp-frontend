@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createFactoryCost, getFactoryCosts, getUploadUrl } from "../shared/lib/factory-cost-api";
+import { createOfficeBill, getOfficeBills } from "../shared/lib/office-bill-api";
+import { getProjects } from "../shared/lib/project-api";
+import { createShipmentCosts, getShipmentCosts } from "../shared/lib/shipment-cost-api";
 
-const accountTabs = ["Dashboard", "Project Wise", "Factory Costs", "Exports Costs", "Monthly Bills", "Office Costs"];
+const accountTabs = ["Dashboard", "Project Wise", "Factory Costs", "Shipment Costs", "Office Costs"];
 
 const summaryCards = [
   { key: "receivables", label: "Total Receivables", value: "৳0", tone: "amber", icon: "receivables" },
@@ -73,67 +77,14 @@ const projectWiseProfitRows = [
   },
 ];
 
-const factoryCostRows = {
-  "Daily Costs": [{ id: "FC-001", category: "Electricity", amount: "৳450", date: "2026-04-17", recipe: "-" }],
-  "Monthly Costs": [{ id: "FC-002", category: "Rent", amount: "৳15,000", date: "2026-04-01", recipe: "-" }],
-};
+function getTodayDateValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
 
-const initialExportCosts = [
-  {
-    id: "EXP-001",
-    project: "PRJ-001",
-    destination: "USA",
-    date: "2026-04-15",
-    totalCost: "৳1,850",
-    items: [
-      { category: "Shipping", amount: 1200, description: "Ocean freight" },
-      { category: "Customs", amount: 350, description: "Import clearance" },
-      { category: "Insurance", amount: 300, description: "Cargo insurance" },
-    ],
-  },
-];
-
-const initialMonthlyBills = [
-  {
-    id: "BILL-001",
-    vendor: "Electric Company",
-    category: "Utilities",
-    expenseFor: "Factory",
-    amount: "৳2,500",
-    dueDate: "2026-04-25",
-    status: "Pending",
-    receipt: null,
-  },
-  {
-    id: "BILL-002",
-    vendor: "Internet Provider",
-    category: "Services",
-    expenseFor: "Office",
-    amount: "৳150",
-    dueDate: "2026-04-20",
-    status: "Paid",
-    receipt: null,
-  },
-];
-
-const initialOfficeCosts = [
-  {
-    id: "OFC-001",
-    category: "Travel",
-    description: "Client meeting in NY",
-    amount: "৳350",
-    date: "2026-04-15",
-    receipt: "-",
-  },
-  {
-    id: "OFC-002",
-    category: "Supplies",
-    description: "Office supplies",
-    amount: "৳125",
-    date: "2026-04-14",
-    receipt: "-",
-  },
-];
+  return `${year}-${month}-${day}`;
+}
 
 function DownloadIcon() {
   return (
@@ -167,6 +118,23 @@ function PlusIcon() {
       strokeWidth="1.8"
     >
       <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+function MinusIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+    >
       <path d="M5 12h14" />
     </svg>
   );
@@ -520,9 +488,162 @@ function ProjectWisePanel() {
 
 function FactoryCostsPanel() {
   const [activeCostTab, setActiveCostTab] = useState("Daily Costs");
-  const rows = factoryCostRows[activeCostTab];
+  const [factoryCosts, setFactoryCosts] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [receiptPreview, setReceiptPreview] = useState(null);
+  const [receiptZoom, setReceiptZoom] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [formValues, setFormValues] = useState({
+    category: "",
+    description: "",
+    amount: "",
+    date: getTodayDateValue(),
+    receiptName: "",
+    receiptFile: null,
+  });
+  const rows = factoryCosts.filter((row) => row.costType === activeCostTab);
+  const totalAmount = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const totalLabel = activeCostTab === "Daily Costs" ? "Total Daily Costs" : "Total Monthly Costs";
-  const totalValue = activeCostTab === "Daily Costs" ? "৳450" : "৳15,000";
+  const totalValue = `৳${totalAmount.toLocaleString("en-US")}`;
+  const receiptPreviewUrl = receiptPreview?.receiptLocation ? getUploadUrl(receiptPreview.receiptLocation) : "";
+  const isReceiptPreviewPdf = /\.pdf($|\?)/i.test(receiptPreviewUrl);
+  const receiptZoomStyle = {
+    transform: `scale(${receiptZoom})`,
+    transformOrigin: "top center",
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFactoryCosts() {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await getFactoryCosts();
+
+        if (isMounted) {
+          setFactoryCosts(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message || "Failed to load factory costs.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadFactoryCosts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  function openModal() {
+    setFormValues({
+      category: "",
+      description: "",
+      amount: "",
+      date: getTodayDateValue(),
+      receiptName: "",
+      receiptFile: null,
+    });
+    setIsModalOpen(true);
+  }
+
+  function closeModal() {
+    setIsModalOpen(false);
+    setFormValues({
+      category: "",
+      description: "",
+      amount: "",
+      date: getTodayDateValue(),
+      receiptName: "",
+      receiptFile: null,
+    });
+  }
+
+  function handleFormChange(event) {
+    const { name, value, files, type } = event.target;
+    setFormValues((current) => ({
+      ...current,
+      [name]: type === "file" ? files?.[0]?.name ?? "" : value,
+      ...(type === "file" ? { receiptFile: files?.[0] ?? null } : {}),
+    }));
+  }
+
+  function handleExport() {
+    const header = ["ID", "Category", "Description", "Amount", "Date", "Receipt"];
+    const csvRows = rows.map((row) => [row.id, row.category, row.description, row.amountFormatted, row.date, row.receiptName]);
+    const csv = [header, ...csvRows].map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = activeCostTab === "Daily Costs" ? "daily-factory-costs.csv" : "monthly-factory-costs.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+
+    if (!formValues.category || !formValues.description || !formValues.amount || !formValues.date) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setErrorMessage("");
+
+      const payload = new FormData();
+      payload.append("category", activeCostTab === "Daily Costs" ? "daily" : "monthly");
+      payload.append("costCategory", formValues.category);
+      payload.append("description", formValues.description);
+      payload.append("amount", String(Number(formValues.amount)));
+      payload.append("date", formValues.date);
+
+      if (formValues.receiptFile) {
+        payload.append("receipt", formValues.receiptFile);
+      }
+
+      const createdCost = await createFactoryCost(payload);
+
+      setFactoryCosts((current) => [createdCost, ...current]);
+      closeModal();
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to save factory cost.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function handleViewReceipt(row) {
+    if (!row.receiptLocation || row.receiptLocation === "-") {
+      return;
+    }
+
+    setReceiptZoom(1);
+    setReceiptPreview(row);
+  }
+
+  function closeReceiptPreview() {
+    setReceiptPreview(null);
+    setReceiptZoom(1);
+  }
+
+  function zoomReceiptIn() {
+    setReceiptZoom((current) => Math.min(current + 0.25, 2));
+  }
+
+  function zoomReceiptOut() {
+    setReceiptZoom((current) => Math.max(current - 0.25, 0.5));
+  }
 
   return (
     <div className="space-y-5">
@@ -535,6 +656,7 @@ function FactoryCostsPanel() {
         <div className="flex flex-wrap gap-3">
           <button
             className="inline-flex items-center gap-2 rounded-[6px] border border-[#f5a30f] bg-transparent px-5 py-3 text-[12px] font-medium text-[#f5f7fb] transition hover:bg-[#f5a30f]/10"
+            onClick={handleExport}
             type="button"
           >
             <DownloadIcon />
@@ -542,6 +664,7 @@ function FactoryCostsPanel() {
           </button>
           <button
             className="inline-flex items-center gap-2 rounded-[6px] bg-[#f5a30f] px-5 py-3 text-[12px] font-medium text-[#172136] transition hover:bg-[#ffb327]"
+            onClick={openModal}
             type="button"
           >
             <PlusIcon />
@@ -573,6 +696,8 @@ function FactoryCostsPanel() {
         </div>
       </section>
 
+      {errorMessage ? <div className="rounded-[5px] border border-[#7f1d1d] bg-[#3a1d1d] px-4 py-3 text-[12px] text-[#fecaca]">{errorMessage}</div> : null}
+
       <section className="rounded-[5px] border border-[#344059] bg-[#202b3f] px-4 py-4">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
@@ -580,30 +705,169 @@ function FactoryCostsPanel() {
               <tr className="border-b border-[#344059] text-[10px] uppercase tracking-[0.14em] text-[#98a3b8]">
                 <th className="pb-3 font-medium">ID</th>
                 <th className="pb-3 font-medium">Category</th>
+                <th className="pb-3 font-medium">Description</th>
                 <th className="pb-3 font-medium">Amount</th>
                 <th className="pb-3 font-medium">Date</th>
-                <th className="pb-3 font-medium">Recipe</th>
+                <th className="pb-3 font-medium">Receipt</th>
               </tr>
             </thead>
             <tbody>
+              {isLoading ? (
+                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]">
+                  <td className="py-6 text-center text-[#9aa5ba]" colSpan={6}>
+                    Loading factory costs...
+                  </td>
+                </tr>
+              ) : null}
+              {!isLoading && rows.length === 0 ? (
+                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]">
+                  <td className="py-6 text-center text-[#9aa5ba]" colSpan={6}>
+                    No {activeCostTab === "Daily Costs" ? "daily" : "monthly"} factory costs yet.
+                  </td>
+                </tr>
+              ) : null}
               {rows.map((row) => (
                 <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]" key={row.id}>
                   <td className="py-4 font-semibold text-[#f5a30f]">{row.id}</td>
                   <td className="py-4">{row.category}</td>
-                  <td className="py-4 font-semibold text-[#f5a30f]">{row.amount}</td>
+                  <td className="py-4">{row.description}</td>
+                  <td className="py-4 font-semibold text-[#f5a30f]">{row.amountFormatted}</td>
                   <td className="py-4 text-[#b6c0d2]">{row.date}</td>
-                  <td className="py-4 text-[#b6c0d2]">{row.recipe}</td>
+                  <td className="py-4 text-[#b6c0d2]">
+                    {row.receiptLocation && row.receiptLocation.startsWith("/uploads/factory_cost_receipt/") ? (
+                      <button
+                        className="text-[13px] font-medium text-[#f5a30f] transition hover:text-[#ffbf47]"
+                        onClick={() => handleViewReceipt(row)}
+                        type="button"
+                      >
+                        View
+                      </button>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
+
+      {isModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1422]/70 px-4 py-8">
+          <div className="w-full max-w-[450px] overflow-hidden rounded-[6px] border border-[#344059] bg-[#202b3f] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between border-b border-[#344059] px-4 py-4">
+              <h3 className="text-[20px] font-semibold text-[#e6ebf4]">Add {activeCostTab === "Daily Costs" ? "Daily" : "Monthly"} Factory Cost</h3>
+              <button className="text-[#d7deea] transition hover:text-white" onClick={closeModal} type="button">
+                <CloseIcon />
+              </button>
+            </div>
+
+            <form className="space-y-4 px-4 py-4" onSubmit={handleSubmit}>
+              <Field label="Category *" name="category" onChange={handleFormChange} placeholder="" value={formValues.category} />
+              <Field label="Description *" name="description" onChange={handleFormChange} placeholder="" value={formValues.description} />
+              <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} placeholder="0.00" type="number" value={formValues.amount} />
+              <Field label="Date" name="date" onChange={handleFormChange} placeholder="" readOnly type="date" value={formValues.date} />
+              <ReceiptUpload
+                fileName={formValues.receiptName}
+                onChange={handleFormChange}
+              />
+
+              <div className="flex items-center justify-end gap-3 border-t border-[#344059] pt-4">
+                <button className="px-4 py-2 text-[12px] text-[#d7deea] transition hover:text-white" onClick={closeModal} type="button">
+                  Cancel
+                </button>
+                <button
+                  className="rounded-[4px] bg-[#f5a30f] px-4 py-2 text-[12px] font-medium text-[#172136] transition hover:bg-[#ffb327] disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isSaving}
+                  type="submit"
+                >
+                  {isSaving ? "Saving..." : "Save Cost"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {receiptPreview ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1422]/75 px-4 py-4">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[820px] flex-col overflow-hidden rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between border-b border-[#314058] px-4 py-4">
+              <div>
+                <h3 className="text-[20px] font-semibold text-[#e6ebf4]">Factory Cost Receipt</h3>
+                <p className="mt-1 text-[13px] text-[#8f9cb0]">
+                  {receiptPreview.id} · {receiptPreview.category}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center overflow-hidden rounded-md border border-[#3c4b64] bg-[#182235]">
+                  <button
+                    aria-label="Zoom out receipt"
+                    className="flex h-9 w-9 items-center justify-center text-[#d7deea] transition hover:bg-[#26354b] hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+                    disabled={receiptZoom <= 0.5}
+                    onClick={zoomReceiptOut}
+                    title="Zoom out"
+                    type="button"
+                  >
+                    <MinusIcon />
+                  </button>
+                  <span className="min-w-14 border-x border-[#3c4b64] px-2 text-center text-[12px] font-medium text-[#d7deea]">
+                    {Math.round(receiptZoom * 100)}%
+                  </span>
+                  <button
+                    aria-label="Zoom in receipt"
+                    className="flex h-9 w-9 items-center justify-center text-[#d7deea] transition hover:bg-[#26354b] hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+                    disabled={receiptZoom >= 2}
+                    onClick={zoomReceiptIn}
+                    title="Zoom in"
+                    type="button"
+                  >
+                    <PlusIcon />
+                  </button>
+                </div>
+                <button className="text-[#d7deea] transition hover:text-white" onClick={closeReceiptPreview} type="button">
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto bg-[#182235] p-4">
+              {isReceiptPreviewPdf ? (
+                <div
+                  className="mx-auto w-full"
+                  style={{
+                    height: `${70 * receiptZoom}vh`,
+                    maxWidth: `${100 * receiptZoom}%`,
+                    width: `${100 * receiptZoom}%`,
+                  }}
+                >
+                  <iframe
+                    className="h-[70vh] w-full rounded-md border border-[#314058] bg-white"
+                    src={receiptPreviewUrl}
+                    style={receiptZoomStyle}
+                    title="Factory cost receipt"
+                  />
+                </div>
+              ) : (
+                <div className="flex justify-center">
+                  <img
+                    alt="Factory cost receipt"
+                    className="max-h-[70vh] max-w-full rounded-md border border-[#314058] object-contain"
+                    src={receiptPreviewUrl}
+                    style={receiptZoomStyle}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function Field({ label, name, placeholder, value, onChange, type = "text" }) {
+function Field({ label, name, placeholder, value, onChange, type = "text", readOnly = false }) {
   return (
     <label className="block space-y-2">
       <span className="text-[12px] font-medium text-[#d7deea]">{label}</span>
@@ -612,6 +876,7 @@ function Field({ label, name, placeholder, value, onChange, type = "text" }) {
         name={name}
         onChange={onChange}
         placeholder={placeholder}
+        readOnly={readOnly}
         type={type}
         value={value}
       />
@@ -619,14 +884,19 @@ function Field({ label, name, placeholder, value, onChange, type = "text" }) {
   );
 }
 
-function ReceiptUpload({ fileName, onSelect }) {
+function ReceiptUpload({ fileName, onSelect, onChange }) {
   return (
     <label className="block space-y-2">
       <span className="text-[12px] font-medium text-[#d7deea]">Receipt (Optional)</span>
       <div className="flex min-h-[92px] cursor-pointer items-center justify-center rounded-[4px] border border-dashed border-[#344059] bg-[#202b3f] px-4 text-center text-[12px] text-[#8e9aad]">
         <input
+          accept="image/*,.pdf"
           className="sr-only"
-          onChange={(event) => onSelect(event.target.files?.[0]?.name ?? "")}
+          onChange={(event) => {
+            onChange?.(event);
+            onSelect?.(event.target.files?.[0]?.name ?? "");
+          }}
+          name="receiptName"
           type="file"
         />
         <span>{fileName || "Upload Image or PDF (Max 5MB)"}</span>
@@ -636,20 +906,55 @@ function ReceiptUpload({ fileName, onSelect }) {
 }
 
 function ExportCostsPanel() {
-  const [exportCosts, setExportCosts] = useState(initialExportCosts);
+  const [exportCosts, setExportCosts] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBreakdown, setSelectedBreakdown] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [formValues, setFormValues] = useState({
     project: "",
     destination: "",
-    date: "",
+    date: getTodayDateValue(),
     category: "",
     amount: "",
     description: "",
   });
   const [draftItems, setDraftItems] = useState([]);
 
-  const totalExportCosts = exportCosts.reduce((sum, item) => sum + Number(item.totalCost.replace(/[^\d.-]/g, "")), 0);
+  const totalExportCosts = exportCosts.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadShipmentCosts() {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const [shipmentCosts, projectRows] = await Promise.all([getShipmentCosts(), getProjects()]);
+
+        if (isMounted) {
+          setExportCosts(Array.isArray(shipmentCosts) ? shipmentCosts : []);
+          setProjects(Array.isArray(projectRows) ? projectRows : []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message || "Failed to load shipment costs.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadShipmentCosts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function handleExport() {
     const header = ["ID", "Project", "Destination", "Date", "Total Cost"];
@@ -668,7 +973,7 @@ function ExportCostsPanel() {
     setFormValues({
       project: "",
       destination: "",
-      date: "",
+      date: getTodayDateValue(),
       category: "",
       amount: "",
       description: "",
@@ -682,7 +987,7 @@ function ExportCostsPanel() {
     setFormValues({
       project: "",
       destination: "",
-      date: "",
+      date: getTodayDateValue(),
       category: "",
       amount: "",
       description: "",
@@ -717,7 +1022,7 @@ function ExportCostsPanel() {
     }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const itemsToSave =
       draftItems.length > 0
@@ -732,31 +1037,36 @@ function ExportCostsPanel() {
             ]
           : [];
 
-    const total = itemsToSave.reduce((sum, item) => sum + item.amount, 0);
-    const nextNumber = exportCosts.length + 1;
-    const padded = String(nextNumber).padStart(3, "0");
+    if (!formValues.project || !formValues.destination || !formValues.date || itemsToSave.length === 0) {
+      return;
+    }
 
-    setExportCosts((current) => [
-      ...current,
-      {
-        id: `EXP-${padded}`,
-        project: formValues.project,
+    try {
+      setIsSaving(true);
+      setErrorMessage("");
+
+      const shipmentCosts = await createShipmentCosts({
+        projectId: Number(formValues.project),
         destination: formValues.destination,
-        date: formValues.date,
-        totalCost: `৳${total.toLocaleString("en-US")}`,
+        shipmentDate: formValues.date,
         items: itemsToSave,
-      },
-    ]);
+      });
 
-    closeModal();
+      setExportCosts(Array.isArray(shipmentCosts) ? shipmentCosts : []);
+      closeModal();
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to save shipment cost.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
     <div className="space-y-5">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1">
-          <h2 className="text-[18px] font-semibold leading-none text-[#f5f7fb]">Export Costs</h2>
-          <p className="text-[11px] text-[#8e9aad]">Track international shipping and export expenses with itemized breakdown</p>
+          <h2 className="text-[18px] font-semibold leading-none text-[#f5f7fb]">Shipment Cost</h2>
+          <p className="text-[11px] text-[#8e9aad]">Track shipment expenses with itemized breakdown</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -781,10 +1091,12 @@ function ExportCostsPanel() {
 
       <section className="rounded-[5px] border border-[#80561a] bg-[#2f2a28] px-5 py-5">
         <div className="flex items-center justify-between gap-4">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-[#98a3b8]">Total Export Costs</div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-[#98a3b8]">Total Shipment Cost</div>
           <div className="text-[30px] font-semibold text-[#ffb01a]">৳{totalExportCosts.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         </div>
       </section>
+
+      {errorMessage ? <div className="rounded-[5px] border border-[#7f1d1d] bg-[#3a1d1d] px-4 py-3 text-[12px] text-[#fecaca]">{errorMessage}</div> : null}
 
       <section className="rounded-[5px] border border-[#344059] bg-[#202b3f] px-4 py-4">
         <div className="overflow-x-auto">
@@ -800,8 +1112,22 @@ function ExportCostsPanel() {
               </tr>
             </thead>
             <tbody>
+              {isLoading ? (
+                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]">
+                  <td className="py-6 text-center text-[#9aa5ba]" colSpan={6}>
+                    Loading shipment costs...
+                  </td>
+                </tr>
+              ) : null}
+              {!isLoading && exportCosts.length === 0 ? (
+                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]">
+                  <td className="py-6 text-center text-[#9aa5ba]" colSpan={6}>
+                    No shipment costs yet.
+                  </td>
+                </tr>
+              ) : null}
               {exportCosts.map((item) => (
-                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]" key={item.id}>
+                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]" key={`${item.projectId}-${item.destination}-${item.date}`}>
                   <td className="py-4 font-semibold text-[#f5a30f]">{item.id}</td>
                   <td className="py-4">{item.project}</td>
                   <td className="py-4">{item.destination}</td>
@@ -826,38 +1152,49 @@ function ExportCostsPanel() {
 
       {isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1422]/70 px-4 py-8">
-          <div className="w-full max-w-[450px] overflow-hidden rounded-[6px] border border-[#344059] bg-[#202b3f] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+          <div className="w-full max-w-[960px] overflow-hidden rounded-[6px] border border-[#344059] bg-[#202b3f] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[#344059] px-4 py-4">
-              <h3 className="text-[20px] font-semibold text-[#e6ebf4]">Add Export Cost Breakdown</h3>
+              <h3 className="text-[20px] font-semibold text-[#e6ebf4]">Add Shipment Cost Breakdown</h3>
               <button className="text-[#d7deea] transition hover:text-white" onClick={closeModal} type="button">
                 <CloseIcon />
               </button>
             </div>
 
             <form className="space-y-4 px-4 py-4" onSubmit={handleSubmit}>
-              <Field label="Project *" name="project" onChange={handleFormChange} placeholder="" value={formValues.project} />
-              <Field
-                label="Destination *"
-                name="destination"
-                onChange={handleFormChange}
-                placeholder="e.g., USA, UK, Germany"
-                value={formValues.destination}
-              />
-              <Field label="Date" name="date" onChange={handleFormChange} placeholder="" type="text" value={formValues.date} />
-
-              <div className="border-t border-[#344059] pt-4">
-                <div className="mb-3 text-[13px] font-semibold text-[#d7deea]">Cost Items</div>
-                <div className="space-y-4">
-                  <Field label="Category *" name="category" onChange={handleFormChange} placeholder="" value={formValues.category} />
-                  <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} placeholder="0.00" type="number" value={formValues.amount} />
-                  <Field
-                    label="Description"
-                    name="description"
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <label className="block space-y-2">
+                  <span className="text-[12px] font-medium text-[#d7deea]">Project *</span>
+                  <select
+                    className="h-11 w-full rounded-[4px] border border-[#344059] bg-[#202b3f] px-3 text-[13px] text-white outline-none focus:border-[#4e6180]"
+                    name="project"
                     onChange={handleFormChange}
-                    placeholder="Optional details"
-                    value={formValues.description}
-                  />
-                </div>
+                    value={formValues.project}
+                  >
+                    <option value="">Select project</option>
+                    {projects.map((project) => (
+                      <option key={project.recordId} value={project.recordId}>
+                        {project.id} - {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Field
+                  label="Destination *"
+                  name="destination"
+                  onChange={handleFormChange}
+                  placeholder="e.g., USA, UK, Germany"
+                  value={formValues.destination}
+                />
+                <Field label="Date *" name="date" onChange={handleFormChange} placeholder="" type="date" value={formValues.date} />
+                <Field label="Category *" name="category" onChange={handleFormChange} placeholder="" value={formValues.category} />
+                <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} placeholder="0.00" type="number" value={formValues.amount} />
+                <Field
+                  label="Description"
+                  name="description"
+                  onChange={handleFormChange}
+                  placeholder="Optional details"
+                  value={formValues.description}
+                />
               </div>
 
               <button
@@ -884,8 +1221,12 @@ function ExportCostsPanel() {
                 <button className="px-4 py-2 text-[12px] text-[#d7deea] transition hover:text-white" onClick={closeModal} type="button">
                   Cancel
                 </button>
-                <button className="rounded-[4px] bg-[#f5a30f] px-4 py-2 text-[12px] font-medium text-[#172136] transition hover:bg-[#ffb327]" type="submit">
-                  Save Entry
+                <button
+                  className="rounded-[4px] bg-[#f5a30f] px-4 py-2 text-[12px] font-medium text-[#172136] transition hover:bg-[#ffb327] disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isSaving}
+                  type="submit"
+                >
+                  {isSaving ? "Saving..." : "Save Entry"}
                 </button>
               </div>
             </form>
@@ -927,26 +1268,59 @@ function ExportCostsPanel() {
 }
 
 function MonthlyBillsPanel() {
-  const [monthlyBills, setMonthlyBills] = useState(initialMonthlyBills);
+  const [monthlyBills, setMonthlyBills] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [formValues, setFormValues] = useState({
-    vendor: "",
     category: "",
-    expenseFor: "",
+    description: "",
     amount: "",
-    dueDate: "",
+    date: getTodayDateValue(),
     receipt: "",
+    receiptFile: null,
   });
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadMonthlyBills() {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await getMonthlyBills();
+
+        if (isMounted) {
+          setMonthlyBills(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message || "Failed to load monthly bills.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadMonthlyBills();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   function handleExport() {
-    const header = ["Bill ID", "Vendor", "Category", "Expense For", "Amount", "Due Date", "Status"];
+    const header = ["Bill ID", "Category", "Description", "Amount", "Date", "Receipt", "Status"];
     const rows = monthlyBills.map((item) => [
       item.id,
-      item.vendor,
       item.category,
-      item.expenseFor,
-      item.amount,
-      item.dueDate,
+      item.description,
+      item.amountFormatted || item.amount,
+      item.billDate,
+      item.receiptName || "-",
       item.status,
     ]);
     const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
@@ -961,12 +1335,12 @@ function MonthlyBillsPanel() {
 
   function openModal() {
     setFormValues({
-      vendor: "",
       category: "",
-      expenseFor: "",
+      description: "",
       amount: "",
-      dueDate: "",
+      date: getTodayDateValue(),
       receipt: "",
+      receiptFile: null,
     });
     setIsModalOpen(true);
   }
@@ -976,30 +1350,39 @@ function MonthlyBillsPanel() {
   }
 
   function handleFormChange(event) {
-    const { name, value } = event.target;
-    setFormValues((current) => ({ ...current, [name]: value }));
+    const { name, value, files, type } = event.target;
+    setFormValues((current) => ({
+      ...current,
+      [name]: type === "file" ? files?.[0]?.name ?? "" : value,
+      ...(type === "file" ? { receiptFile: files?.[0] ?? null } : {}),
+    }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    const nextNumber = monthlyBills.length + 1;
-    const padded = String(nextNumber).padStart(3, "0");
 
-    setMonthlyBills((current) => [
-      ...current,
-      {
-        id: `BILL-${padded}`,
-        vendor: formValues.vendor,
-        category: formValues.category,
-        expenseFor: formValues.expenseFor,
-        amount: `৳${Number(formValues.amount || 0).toLocaleString("en-US")}`,
-        dueDate: formValues.dueDate,
-        status: "Pending",
-        receipt: formValues.receipt || null,
-      },
-    ]);
+    try {
+      setIsSaving(true);
+      setErrorMessage("");
 
-    closeModal();
+      const payload = new FormData();
+      payload.append("category", formValues.category);
+      payload.append("description", formValues.description);
+      payload.append("amount", formValues.amount);
+      payload.append("billDate", formValues.date);
+
+      if (formValues.receiptFile) {
+        payload.append("receipt", formValues.receiptFile);
+      }
+
+      const newBill = await createMonthlyBill(payload);
+      setMonthlyBills((current) => [newBill, ...current]);
+      closeModal();
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to save monthly bill.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function toggleBillStatus(id) {
@@ -1038,52 +1421,59 @@ function MonthlyBillsPanel() {
         </div>
       </section>
 
-      <section className="rounded-[5px] border border-[#344059] bg-[#202b3f] px-4 py-4">
+      {errorMessage ? <div className="rounded-[5px] border border-[#7f1d1d] bg-[#3a1d1d] px-4 py-3 text-[12px] text-[#fecaca]">{errorMessage}</div> : null}
+
+      <section className="rounded-[5px] border border-[#344059] bg-[#202b3f] px-4 py-3">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[1000px] table-fixed border-collapse text-left">
             <thead>
-              <tr className="border-b border-[#344059] text-[10px] uppercase tracking-[0.14em] text-[#98a3b8]">
-                <th className="pb-3 font-medium">Bill ID</th>
-                <th className="pb-3 font-medium">Vendor</th>
-                <th className="pb-3 font-medium">Category</th>
-                <th className="pb-3 font-medium">Expense For</th>
-                <th className="pb-3 font-medium">Amount</th>
-                <th className="pb-3 font-medium">Due Date</th>
-                <th className="pb-3 font-medium">Status</th>
-                <th className="pb-3 text-right font-medium">Actions</th>
+              <tr className="border-b border-[#344059] text-[10px] uppercase tracking-[0.16em] text-[#93a0b8]">
+                <th className="w-[110px] pb-4 pt-3 font-medium">Bill ID</th>
+                <th className="w-[110px] pb-4 pt-3 font-medium">Category</th>
+                <th className="w-[110px] pb-4 pt-3 font-medium">Description</th>
+                <th className="w-[110px] pb-4 pt-3 font-medium">Amount</th>
+                <th className="w-[110px] pb-4 pt-3 font-medium">Date</th>
+                <th className="w-[110px] pb-4 pt-3 font-medium">Receipt</th>
+                <th className="w-[110px] pb-4 pt-3 font-medium">Status</th>
+                <th className="w-[140px] pb-4 pt-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {monthlyBills.map((item) => (
-                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]" key={item.id}>
-                  <td className="py-4 font-semibold text-[#f5a30f]">{item.id}</td>
-                  <td className="py-4">{item.vendor}</td>
-                  <td className="py-4">{item.category}</td>
-                  <td className="py-4">
-                    <span
-                      className={[
-                        "inline-flex rounded-[4px] px-2 py-1 text-[10px] font-medium",
-                        item.expenseFor === "Factory" ? "bg-[#204a84] text-[#a9d0ff]" : "bg-[#4c5568] text-[#d7deea]",
-                      ].join(" ")}
-                    >
-                      {item.expenseFor}
-                    </span>
+              {isLoading ? (
+                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]">
+                  <td className="py-6 text-center text-[#9aa5ba]" colSpan={8}>
+                    Loading monthly bills...
                   </td>
-                  <td className="py-4 font-semibold text-[#f5a30f]">{item.amount}</td>
-                  <td className="py-4 text-[#b6c0d2]">{item.dueDate}</td>
-                  <td className="py-4">
+                </tr>
+              ) : null}
+              {!isLoading && monthlyBills.length === 0 ? (
+                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]">
+                  <td className="py-6 text-center text-[#9aa5ba]" colSpan={8}>
+                    No monthly bills yet.
+                  </td>
+                </tr>
+              ) : null}
+              {monthlyBills.map((item) => (
+                <tr className="border-b border-[#344059] text-[14px] text-[#d7deea]" key={item.id}>
+                  <td className="py-5 font-semibold text-[#f5a30f]">{item.id}</td>
+                  <td className="py-5 lowercase">{item.category}</td>
+                  <td className="py-5">{item.description}</td>
+                  <td className="py-5 font-semibold text-[#f5a30f]">{item.amountFormatted}</td>
+                  <td className="py-5 text-[#c0c8d8]">{item.billDate}</td>
+                  <td className="py-5 text-[#c0c8d8]">{item.receiptName}</td>
+                  <td className="py-5">
                     <span
                       className={[
-                        "inline-flex rounded-[4px] px-2 py-1 text-[10px] font-medium",
-                        item.status === "Paid" ? "bg-[#5e4c20] text-[#f7c25f]" : "bg-[#6b4b28] text-[#ffcf75]",
+                        "inline-flex rounded-[4px] px-[8px] py-[4px] text-[10px] font-medium leading-none",
+                        item.status === "Paid" ? "bg-[#466c2f] text-[#d7f0ae]" : "bg-[#7b5a26] text-[#ffd27a]",
                       ].join(" ")}
                     >
                       {item.status}
                     </span>
                   </td>
-                  <td className="py-4 text-right">
+                  <td className="py-5 text-right">
                     <button
-                      className="rounded-[4px] bg-[#f5a30f] px-3 py-2 text-[12px] font-medium text-[#172136] transition hover:bg-[#ffb327]"
+                      className="rounded-[4px] bg-[#ffb01a] px-4 py-[10px] text-[12px] font-medium text-[#172136] transition hover:bg-[#ffc13d]"
                       onClick={() => toggleBillStatus(item.id)}
                       type="button"
                     >
@@ -1099,7 +1489,7 @@ function MonthlyBillsPanel() {
 
       {isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1422]/70 px-4 py-8">
-          <div className="w-full max-w-[450px] overflow-hidden rounded-[6px] border border-[#344059] bg-[#202b3f] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+          <div className="w-full max-w-[760px] overflow-hidden rounded-[6px] border border-[#344059] bg-[#202b3f] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[#344059] px-4 py-4">
               <h3 className="text-[20px] font-semibold text-[#e6ebf4]">Add Monthly Bill</h3>
               <button className="text-[#d7deea] transition hover:text-white" onClick={closeModal} type="button">
@@ -1108,25 +1498,32 @@ function MonthlyBillsPanel() {
             </div>
 
             <form className="space-y-4 px-4 py-4" onSubmit={handleSubmit}>
-              <Field label="Vendor *" name="vendor" onChange={handleFormChange} placeholder="" value={formValues.vendor} />
-              <Field
-                label="Category"
-                name="category"
-                onChange={handleFormChange}
-                placeholder="e.g., Utilities, Services"
-                value={formValues.category}
-              />
-              <Field label="Expense For *" name="expenseFor" onChange={handleFormChange} placeholder="" value={formValues.expenseFor} />
-              <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} placeholder="" type="number" value={formValues.amount} />
-              <Field label="Due Date *" name="dueDate" onChange={handleFormChange} placeholder="" value={formValues.dueDate} />
-              <ReceiptUpload fileName={formValues.receipt} onSelect={(fileName) => setFormValues((current) => ({ ...current, receipt: fileName }))} />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field
+                  label="Category *"
+                  name="category"
+                  onChange={handleFormChange}
+                  placeholder=""
+                  value={formValues.category}
+                />
+                <Field label="Description *" name="description" onChange={handleFormChange} placeholder="" value={formValues.description} />
+                <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} placeholder="" type="number" value={formValues.amount} />
+                <Field label="Date *" name="date" onChange={handleFormChange} placeholder="" type="date" value={formValues.date} />
+                <div className="md:col-span-2">
+                  <ReceiptUpload fileName={formValues.receipt} onChange={handleFormChange} />
+                </div>
+              </div>
 
               <div className="flex items-center justify-end gap-3 border-t border-[#344059] pt-4">
                 <button className="px-4 py-2 text-[12px] text-[#d7deea] transition hover:text-white" onClick={closeModal} type="button">
                   Cancel
                 </button>
-                <button className="rounded-[4px] bg-[#f5a30f] px-4 py-2 text-[12px] font-medium text-[#172136] transition hover:bg-[#ffb327]" type="submit">
-                  Add Bill
+                <button
+                  className="rounded-[4px] bg-[#f5a30f] px-4 py-2 text-[12px] font-medium text-[#172136] transition hover:bg-[#ffb327] disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isSaving}
+                  type="submit"
+                >
+                  {isSaving ? "Saving..." : "Add Bill"}
                 </button>
               </div>
             </form>
@@ -1138,27 +1535,64 @@ function MonthlyBillsPanel() {
 }
 
 function OfficeCostsPanel() {
-  const [officeCosts, setOfficeCosts] = useState(initialOfficeCosts);
+  const [activeCostTab, setActiveCostTab] = useState("Daily Costs");
+  const [officeCosts, setOfficeCosts] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [receiptPreview, setReceiptPreview] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [formValues, setFormValues] = useState({
     category: "",
     description: "",
     amount: "",
-    date: "",
-    receipt: "",
+    date: getTodayDateValue(),
+    receiptName: "",
+    receiptFile: null,
   });
+  const rows = officeCosts.filter((item) => item.costType === activeCostTab);
+  const totalOfficeCosts = rows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const totalLabel = activeCostTab === "Daily Costs" ? "Total Daily Costs" : "Total Monthly Costs";
 
-  const totalOfficeCosts = officeCosts.reduce((sum, item) => sum + Number(item.amount.replace(/[^\d.-]/g, "")), 0);
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadOfficeBills() {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await getOfficeBills();
+
+        if (isMounted) {
+          setOfficeCosts(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message || "Failed to load office costs.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadOfficeBills();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function handleExport() {
-    const header = ["Expense ID", "Category", "Description", "Amount", "Date", "Receipt"];
-    const rows = officeCosts.map((item) => [item.id, item.category, item.description, item.amount, item.date, item.receipt]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
+    const header = ["ID", "Category", "Description", "Amount", "Date", "Receipt"];
+    const csvRows = rows.map((item) => [item.id, item.category, item.description, item.amountFormatted, item.date, item.receiptName]);
+    const csv = [header, ...csvRows].map((row) => row.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "office-costs.csv";
+    link.download = activeCostTab === "Daily Costs" ? "daily-office-costs.csv" : "monthly-office-costs.csv";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -1168,47 +1602,84 @@ function OfficeCostsPanel() {
       category: "",
       description: "",
       amount: "",
-      date: "",
-      receipt: "",
+      date: getTodayDateValue(),
+      receiptName: "",
+      receiptFile: null,
     });
     setIsModalOpen(true);
   }
 
   function closeModal() {
     setIsModalOpen(false);
+    setFormValues({
+      category: "",
+      description: "",
+      amount: "",
+      date: getTodayDateValue(),
+      receiptName: "",
+      receiptFile: null,
+    });
   }
 
   function handleFormChange(event) {
-    const { name, value } = event.target;
-    setFormValues((current) => ({ ...current, [name]: value }));
+    const { name, value, files, type } = event.target;
+    setFormValues((current) => ({
+      ...current,
+      [name]: type === "file" ? files?.[0]?.name ?? "" : value,
+      ...(type === "file" ? { receiptFile: files?.[0] ?? null } : {}),
+    }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    const nextNumber = officeCosts.length + 1;
-    const padded = String(nextNumber).padStart(3, "0");
 
-    setOfficeCosts((current) => [
-      ...current,
-      {
-        id: `OFC-${padded}`,
-        category: formValues.category,
-        description: formValues.description,
-        amount: `৳${Number(formValues.amount || 0).toLocaleString("en-US")}`,
-        date: formValues.date,
-        receipt: formValues.receipt || "-",
-      },
-    ]);
+    if (!formValues.category || !formValues.description || !formValues.amount || !formValues.date) {
+      return;
+    }
 
-    closeModal();
+    try {
+      setIsSaving(true);
+      setErrorMessage("");
+
+      const payload = new FormData();
+      payload.append("category", activeCostTab === "Daily Costs" ? "daily" : "monthly");
+      payload.append("costCategory", formValues.category);
+      payload.append("description", formValues.description);
+      payload.append("amount", String(Number(formValues.amount)));
+      payload.append("date", formValues.date);
+
+      if (formValues.receiptFile) {
+        payload.append("receipt", formValues.receiptFile);
+      }
+
+      const createdCost = await createOfficeBill(payload);
+      setOfficeCosts((current) => [createdCost, ...current]);
+      closeModal();
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to save office cost.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function handleViewReceipt(row) {
+    if (!row.receiptLocation || row.receiptLocation === "-") {
+      return;
+    }
+
+    setReceiptPreview(row);
+  }
+
+  function closeReceiptPreview() {
+    setReceiptPreview(null);
   }
 
   return (
     <div className="space-y-5">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
-          <h2 className="text-[18px] font-semibold leading-none text-[#f5f7fb]">Office Cost</h2>
-          <p className="text-[11px] text-[#8e9aad]">Track general business expenses</p>
+          <h2 className="text-[18px] font-semibold leading-none text-[#f5f7fb]">Office Costs</h2>
+          <p className="text-[11px] text-[#8e9aad]">Track daily and monthly office expenses</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -1226,24 +1697,42 @@ function OfficeCostsPanel() {
             type="button"
           >
             <PlusIcon />
-            Add Expense
+            Add Cost
           </button>
         </div>
       </section>
 
+      <section className="flex flex-wrap gap-2">
+        {["Daily Costs", "Monthly Costs"].map((tab) => (
+          <button
+            className={[
+              "rounded-[4px] px-4 py-[9px] text-[12px] font-medium leading-none transition",
+              activeCostTab === tab ? "bg-[#f5a30f] text-[#172136]" : "bg-[#4a5875] text-[#edf2f7] hover:bg-[#5a6886]",
+            ].join(" ")}
+            key={tab}
+            onClick={() => setActiveCostTab(tab)}
+            type="button"
+          >
+            {tab}
+          </button>
+        ))}
+      </section>
+
       <section className="rounded-[5px] border border-[#80561a] bg-[#2f2a28] px-5 py-5">
         <div className="flex items-center justify-between gap-4">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-[#98a3b8]">Total Expenses (Current Month)</div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-[#98a3b8]">{totalLabel}</div>
           <div className="text-[30px] font-semibold text-[#ffb01a]">৳{totalOfficeCosts.toLocaleString("en-US")}</div>
         </div>
       </section>
 
+      {errorMessage ? <div className="rounded-[5px] border border-[#7f1d1d] bg-[#3a1d1d] px-4 py-3 text-[12px] text-[#fecaca]">{errorMessage}</div> : null}
+
       <section className="rounded-[5px] border border-[#344059] bg-[#202b3f] px-4 py-4">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-[#344059] text-[10px] uppercase tracking-[0.14em] text-[#98a3b8]">
-                <th className="pb-3 font-medium">Expense ID</th>
+                <th className="pb-3 font-medium">ID</th>
                 <th className="pb-3 font-medium">Category</th>
                 <th className="pb-3 font-medium">Description</th>
                 <th className="pb-3 font-medium">Amount</th>
@@ -1252,14 +1741,40 @@ function OfficeCostsPanel() {
               </tr>
             </thead>
             <tbody>
-              {officeCosts.map((item) => (
+              {isLoading ? (
+                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]">
+                  <td className="py-6 text-center text-[#9aa5ba]" colSpan={6}>
+                    Loading office costs...
+                  </td>
+                </tr>
+              ) : null}
+              {!isLoading && rows.length === 0 ? (
+                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]">
+                  <td className="py-6 text-center text-[#9aa5ba]" colSpan={6}>
+                    No {activeCostTab === "Daily Costs" ? "daily" : "monthly"} office costs yet.
+                  </td>
+                </tr>
+              ) : null}
+              {rows.map((item) => (
                 <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]" key={item.id}>
                   <td className="py-4 font-semibold text-[#f5a30f]">{item.id}</td>
                   <td className="py-4">{item.category}</td>
                   <td className="py-4">{item.description}</td>
-                  <td className="py-4 font-semibold text-[#f5a30f]">{item.amount}</td>
+                  <td className="py-4 font-semibold text-[#f5a30f]">{item.amountFormatted}</td>
                   <td className="py-4 text-[#b6c0d2]">{item.date}</td>
-                  <td className="py-4 text-[#b6c0d2]">{item.receipt}</td>
+                  <td className="py-4 text-[#b6c0d2]">
+                    {item.receiptLocation && item.receiptLocation.startsWith("/uploads/office_bill_receipt/") ? (
+                      <button
+                        className="text-[13px] font-medium text-[#f5a30f] transition hover:text-[#ffbf47]"
+                        onClick={() => handleViewReceipt(item)}
+                        type="button"
+                      >
+                        View
+                      </button>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1271,7 +1786,7 @@ function OfficeCostsPanel() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1422]/70 px-4 py-8">
           <div className="w-full max-w-[450px] overflow-hidden rounded-[6px] border border-[#344059] bg-[#202b3f] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[#344059] px-4 py-4">
-              <h3 className="text-[20px] font-semibold text-[#e6ebf4]">Add Expense</h3>
+              <h3 className="text-[20px] font-semibold text-[#e6ebf4]">Add {activeCostTab === "Daily Costs" ? "Daily" : "Monthly"} Office Cost</h3>
               <button className="text-[#d7deea] transition hover:text-white" onClick={closeModal} type="button">
                 <CloseIcon />
               </button>
@@ -1280,19 +1795,51 @@ function OfficeCostsPanel() {
             <form className="space-y-4 px-4 py-4" onSubmit={handleSubmit}>
               <Field label="Category *" name="category" onChange={handleFormChange} placeholder="" value={formValues.category} />
               <Field label="Description *" name="description" onChange={handleFormChange} placeholder="" value={formValues.description} />
-              <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} placeholder="" type="number" value={formValues.amount} />
-              <Field label="Date" name="date" onChange={handleFormChange} placeholder="" value={formValues.date} />
-              <ReceiptUpload fileName={formValues.receipt} onSelect={(fileName) => setFormValues((current) => ({ ...current, receipt: fileName }))} />
+              <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} placeholder="0.00" type="number" value={formValues.amount} />
+              <Field label="Date" name="date" onChange={handleFormChange} placeholder="" readOnly type="date" value={formValues.date} />
+              <ReceiptUpload fileName={formValues.receiptName} onChange={handleFormChange} />
 
               <div className="flex items-center justify-end gap-3 border-t border-[#344059] pt-4">
                 <button className="px-4 py-2 text-[12px] text-[#d7deea] transition hover:text-white" onClick={closeModal} type="button">
                   Cancel
                 </button>
-                <button className="rounded-[4px] bg-[#f5a30f] px-4 py-2 text-[12px] font-medium text-[#172136] transition hover:bg-[#ffb327]" type="submit">
-                  Add Expense
+                <button
+                  className="rounded-[4px] bg-[#f5a30f] px-4 py-2 text-[12px] font-medium text-[#172136] transition hover:bg-[#ffb327] disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isSaving}
+                  type="submit"
+                >
+                  {isSaving ? "Saving..." : "Save Cost"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {receiptPreview ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1422]/75 px-4 py-4">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[820px] flex-col overflow-hidden rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between border-b border-[#314058] px-4 py-4">
+              <div>
+                <h3 className="text-[20px] font-semibold text-[#e6ebf4]">Office Cost Receipt</h3>
+                <p className="mt-1 text-[13px] text-[#8f9cb0]">
+                  {receiptPreview.id} · {receiptPreview.category}
+                </p>
+              </div>
+              <button className="text-[#d7deea] transition hover:text-white" onClick={closeReceiptPreview} type="button">
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto bg-[#182235] p-4">
+              <div className="flex justify-center">
+                <img
+                  alt="Office cost receipt"
+                  className="max-h-[70vh] max-w-full rounded-md border border-[#314058] object-contain"
+                  src={getUploadUrl(receiptPreview.receiptLocation)}
+                />
+              </div>
+            </div>
           </div>
         </div>
       ) : null}
@@ -1331,8 +1878,7 @@ export function AccountsPage() {
           {activeTab === "Dashboard" ? <DashboardPanel /> : null}
           {activeTab === "Project Wise" ? <ProjectWisePanel /> : null}
           {activeTab === "Factory Costs" ? <FactoryCostsPanel /> : null}
-          {activeTab === "Exports Costs" ? <ExportCostsPanel /> : null}
-          {activeTab === "Monthly Bills" ? <MonthlyBillsPanel /> : null}
+          {activeTab === "Shipment Costs" ? <ExportCostsPanel /> : null}
           {activeTab === "Office Costs" ? <OfficeCostsPanel /> : null}
         </div>
       </div>

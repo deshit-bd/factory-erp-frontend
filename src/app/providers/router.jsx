@@ -15,11 +15,11 @@ import { MaterialPurchasePage } from "@/pages/material-purchase-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { ProjectsPage } from "@/pages/projects-page";
 import { RawMaterialSupplierPage } from "@/pages/raw-material-supplier-page";
+import { RawMaterialSupplierPaymentsPage } from "@/pages/raw-material-supplier-payments-page";
 import { RawMaterialStockPage } from "@/pages/raw-material-stock-page";
 import { SalesOrdersPage } from "@/pages/sales-orders-page";
 import { SettingsPage } from "@/pages/settings-page";
 import { SupplierAssignmentPage } from "@/pages/supplier-assignment-page";
-import { SupplierPaymentsPage } from "@/pages/supplier-payments-page";
 import { SupplierProductsTrackingPage } from "@/pages/supplier-products-tracking-page";
 import { SuppliersPage } from "@/pages/suppliers-page";
 
@@ -90,7 +90,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "supplier-payments",
-        element: <SupplierPaymentsPage />,
+        element: <RawMaterialSupplierPaymentsPage />,
       },
       {
         path: "goods-supplier-payments",

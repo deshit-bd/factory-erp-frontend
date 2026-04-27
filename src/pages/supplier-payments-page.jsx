@@ -1,23 +1,4 @@
-import { useState,useEffect } from "react";
-
-import { getProjectGoodsSuppliers } from "@/shared/lib/project-goods-supplier-api";
-import { getRawMaterialSuppliers } from "@/shared/lib/raw-material-supplier-api";
-
-const initialPayments = [
-  {
-    id: "PAY-001",
-    supplierId: "SUP-001",
-    supplier: "Metal Suppliers Inc",
-    project: "PRJ-001",
-    status: "Partial",
-    totalPaid: "৳3,000",
-    remainingDue: "৳3,000",
-    date: "2026-04-16",
-    paymentMethod: "Mobile Banking",
-    previousDueAmount: "৳6,000",
-    invoiceId: "PINV-001",
-  },
-];
+import { useEffect, useState } from "react";
 
 function DownloadIcon() {
   return (
@@ -60,59 +41,97 @@ function EyeIcon() {
   );
 }
 
-function QrMock() {
-  return (
-    <svg aria-hidden="true" className="h-[110px] w-[110px]" viewBox="0 0 110 110">
-      <rect width="110" height="110" fill="#fff" />
-      <rect x="8" y="8" width="28" height="28" fill="#000" />
-      <rect x="14" y="14" width="16" height="16" fill="#fff" />
-      <rect x="74" y="8" width="28" height="28" fill="#000" />
-      <rect x="80" y="14" width="16" height="16" fill="#fff" />
-      <rect x="8" y="74" width="28" height="28" fill="#000" />
-      <rect x="14" y="80" width="16" height="16" fill="#fff" />
-      <rect x="46" y="12" width="8" height="8" fill="#000" />
-      <rect x="56" y="12" width="8" height="8" fill="#000" />
-      <rect x="46" y="22" width="8" height="8" fill="#000" />
-      <rect x="56" y="32" width="8" height="8" fill="#000" />
-      <rect x="42" y="46" width="8" height="8" fill="#000" />
-      <rect x="52" y="46" width="8" height="8" fill="#000" />
-      <rect x="62" y="46" width="8" height="8" fill="#000" />
-      <rect x="72" y="46" width="8" height="8" fill="#000" />
-      <rect x="82" y="46" width="8" height="8" fill="#000" />
-      <rect x="42" y="56" width="8" height="8" fill="#000" />
-      <rect x="62" y="56" width="8" height="8" fill="#000" />
-      <rect x="82" y="56" width="8" height="8" fill="#000" />
-      <rect x="42" y="66" width="8" height="8" fill="#000" />
-      <rect x="52" y="66" width="8" height="8" fill="#000" />
-      <rect x="72" y="66" width="8" height="8" fill="#000" />
-      <rect x="82" y="66" width="8" height="8" fill="#000" />
-      <rect x="46" y="82" width="8" height="8" fill="#000" />
-      <rect x="56" y="82" width="8" height="8" fill="#000" />
-      <rect x="66" y="82" width="8" height="8" fill="#000" />
-      <rect x="76" y="82" width="8" height="8" fill="#000" />
-      <rect x="86" y="82" width="8" height="8" fill="#000" />
-    </svg>
-  );
+function normalizeSupplierOptions(records) {
+  if (Array.isArray(records)) {
+    return records;
+  }
+
+  if (Array.isArray(records?.data)) {
+    return records.data;
+  }
+
+  return [];
+}
+
+function normalizeProjectOptions(records) {
+  if (Array.isArray(records)) {
+    return records;
+  }
+
+  if (Array.isArray(records?.data)) {
+    return records.data;
+  }
+
+  return [];
+}
+
+function getCurrentDateDisplay() {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, "0");
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const year = now.getFullYear();
+
+  return `${day}/${month}/${year}`;
+}
+
+function getCurrentDateValue() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDisplayDateToValue(value) {
+  if (!value) {
+    return "";
+  }
+
+  const [day, month, year] = String(value).split("/");
+
+  if (!day || !month || !year) {
+    return "";
+  }
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatCurrencyNumber(value) {
+  return `৳${Number(value || 0).toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 export function SupplierPaymentsPage({
-  pageTitle = "Supplier Payments",
-  pageDescription = "Track payments with auto invoice generation and due management",
+  pageTitle = "Supplier Payment",
+  pageDescription = "Track supplier payments with auto invoice generation and due management",
   exportFileName = "supplier-payments.csv",
   recordModalTitle = "Record Supplier Payment",
-  supplierOptionsLoader = getRawMaterialSuppliers,
+  supplierOptionsLoader = null,
+  projectOptionsLoader = null,
+  paymentsLoader = null,
+  createPayment = null,
+  showProjectField = true,
+  showProjectColumn = true,
+  showProjectDetails = true,
 }) {
-  const [payments, setPayments] = useState(initialPayments);
+  const [payments, setPayments] = useState([]);
   const [supplierOptions, setSupplierOptions] = useState([]);
+  const [projectOptions, setProjectOptions] = useState([]);
   const [detailsPayment, setDetailsPayment] = useState(null);
   const [invoicePayment, setInvoicePayment] = useState(null);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formValues, setFormValues] = useState({
     supplier: "",
+    project: "",
     paymentMethod: "",
     previousDueAmount: "",
     paidAmount: "",
-    date: "",
+    date: getCurrentDateDisplay(),
   });
 
   useEffect(() => {
@@ -120,10 +139,17 @@ export function SupplierPaymentsPage({
 
     async function loadSuppliers() {
       try {
+        if (!supplierOptionsLoader) {
+          if (isMounted) {
+            setSupplierOptions([]);
+          }
+          return;
+        }
+
         const records = await supplierOptionsLoader();
 
         if (isMounted) {
-          setSupplierOptions(records);
+          setSupplierOptions(normalizeSupplierOptions(records));
         }
       } catch (error) {
         if (isMounted) {
@@ -139,22 +165,93 @@ export function SupplierPaymentsPage({
     };
   }, [supplierOptionsLoader]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProjects() {
+      try {
+        if (!projectOptionsLoader) {
+          if (isMounted) {
+            setProjectOptions([]);
+          }
+          return;
+        }
+
+        const records = await projectOptionsLoader();
+
+        if (isMounted) {
+          setProjectOptions(normalizeProjectOptions(records));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setProjectOptions([]);
+        }
+      }
+    }
+
+    loadProjects();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [projectOptionsLoader]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPayments() {
+      try {
+        if (!paymentsLoader) {
+          if (isMounted) {
+            setPayments([]);
+          }
+          return;
+        }
+
+        const records = await paymentsLoader();
+
+        if (isMounted) {
+          setPayments(Array.isArray(records) ? records : []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setPayments([]);
+          setErrorMessage(error.message);
+        }
+      }
+    }
+
+    loadPayments();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [paymentsLoader]);
+
   const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.totalPaid.replace(/[^\d.-]/g, "")), 0);
   const totalDue = payments.reduce((sum, payment) => sum + Number(payment.remainingDue.replace(/[^\d.-]/g, "")), 0);
   const totalSuppliers = new Set(payments.map((payment) => payment.supplier)).size;
+  const selectedSupplier = supplierOptions.find((supplier) => String(supplier.recordId) === formValues.supplier) ?? null;
+  const currentPreviousDue = Number(formValues.previousDueAmount || 0);
+  const currentPaidAmount = Number(formValues.paidAmount || 0);
+  const currentRemainingDue = Math.max(currentPreviousDue - currentPaidAmount, 0);
 
   function handleExport() {
     const header = ["Payment ID", "Supplier", "Project", "Status", "Total Paid", "Remaining Due", "Date"];
-    const rows = payments.map((payment) => [
-      payment.id,
-      payment.supplier,
-      payment.project,
-      payment.status,
-      payment.totalPaid,
-      payment.remainingDue,
-      payment.date,
-    ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
+    const rows = payments.map((payment) => {
+      const baseRow = [payment.id, payment.supplier];
+
+      if (showProjectColumn) {
+        baseRow.push(payment.project);
+      }
+
+      baseRow.push(payment.status, payment.totalPaid, payment.remainingDue, payment.date);
+      return baseRow;
+    });
+    const normalizedHeader = showProjectColumn
+      ? header
+      : ["Payment ID", "Supplier", "Status", "Total Paid", "Remaining Due", "Date"];
+    const csv = [normalizedHeader, ...rows].map((row) => row.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -165,58 +262,114 @@ export function SupplierPaymentsPage({
   }
 
   function openRecordModal() {
+    setErrorMessage("");
     setFormValues({
       supplier: "",
+      project: showProjectField ? "" : String(projectOptions[0]?.recordId || ""),
       paymentMethod: "",
       previousDueAmount: "",
       paidAmount: "",
-      date: "",
+      date: getCurrentDateDisplay(),
     });
     setIsRecordModalOpen(true);
   }
 
   function closeRecordModal() {
     setIsRecordModalOpen(false);
+    setErrorMessage("");
     setFormValues({
       supplier: "",
+      project: showProjectField ? "" : String(projectOptions[0]?.recordId || ""),
       paymentMethod: "",
       previousDueAmount: "",
       paidAmount: "",
-      date: "",
+      date: getCurrentDateDisplay(),
     });
   }
 
   function handleFormChange(event) {
     const { name, value } = event.target;
+
+    if (name === "supplier") {
+      const selectedOption = supplierOptions.find((supplier) => String(supplier.recordId) === value);
+      const previousDueAmount = selectedOption ? String(selectedOption.previousDue ?? 0) : "";
+
+      setFormValues((current) => ({
+        ...current,
+        supplier: value,
+        previousDueAmount,
+      }));
+      return;
+    }
+
     setFormValues((current) => ({ ...current, [name]: value }));
   }
 
-  function handleRecordPayment(event) {
+  async function handleRecordPayment(event) {
     event.preventDefault();
-    const nextNumber = payments.length + 1;
-    const padded = String(nextNumber).padStart(3, "0");
+    setErrorMessage("");
+
     const previous = Number(formValues.previousDueAmount || 0);
     const paid = Number(formValues.paidAmount || 0);
-    const remaining = Math.max(previous - paid, 0);
 
-    setPayments((current) => [
-      ...current,
-      {
-        id: `PAY-${padded}`,
-        supplierId: `SUP-${padded}`,
-        supplier: formValues.supplier,
-        project: "N/A",
-        status: remaining > 0 ? "Partial" : "Paid",
-        totalPaid: `৳${paid.toLocaleString("en-US")}`,
-        remainingDue: `৳${remaining.toLocaleString("en-US")}`,
-        date: formValues.date,
-        paymentMethod: formValues.paymentMethod,
-        previousDueAmount: `৳${previous.toLocaleString("en-US")}`,
-        invoiceId: `PINV-${padded}`,
-      },
-    ]);
+    if (paid > previous) {
+      setErrorMessage("Paid amount cannot be greater than the remaining due.");
+      return;
+    }
 
-    closeRecordModal();
+    if (!createPayment) {
+      const remaining = Math.max(previous - paid, 0);
+      const resolvedProjectId = formValues.project || String(projectOptions[0]?.recordId || "");
+      const selectedProject = projectOptions.find((project) => String(project.recordId) === resolvedProjectId);
+      const nextNumber = payments.length + 1;
+      const padded = String(nextNumber).padStart(3, "0");
+
+      setPayments((current) => [
+        {
+          id: `PAY-${padded}`,
+          supplierId: selectedSupplier?.id || `SUP-${padded}`,
+          supplier: selectedSupplier?.name || "",
+          project: selectedProject?.id || "N/A",
+          status: remaining > 0 ? "Partial" : "Paid",
+          totalPaid: `৳${paid.toLocaleString("en-US")}`,
+          remainingDue: `৳${remaining.toLocaleString("en-US")}`,
+          date: formValues.date,
+          paymentMethod: formValues.paymentMethod,
+          previousDueAmount: `৳${previous.toLocaleString("en-US")}`,
+          invoiceId: `PINV-${padded}`,
+        },
+        ...current,
+      ]);
+
+      closeRecordModal();
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const createdPayment = await createPayment({
+        paymentDate: formatDisplayDateToValue(formValues.date) || getCurrentDateValue(),
+        supplierId: formValues.supplier,
+        projectId: formValues.project || String(projectOptions[0]?.recordId || ""),
+        paymentMethod: formValues.paymentMethod.toLowerCase(),
+        paidAmount: formValues.paidAmount,
+      });
+
+      setPayments((current) => [createdPayment, ...current]);
+      setSupplierOptions((current) =>
+        current.map((supplier) =>
+          String(supplier.recordId) === formValues.supplier
+            ? { ...supplier, previousDue: Number(createdPayment.remainingDue.replace(/[^\d.-]/g, "")) }
+            : supplier,
+        ),
+      );
+      closeRecordModal();
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -247,6 +400,8 @@ export function SupplierPaymentsPage({
         </div>
       </div>
 
+      {errorMessage ? <div className="rounded-md border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[14px] text-[#f7c8cf]">{errorMessage}</div> : null}
+
       <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <article className="rounded-[4px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
           <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--app-text-soft)]">Total Paid</div>
@@ -269,7 +424,7 @@ export function SupplierPaymentsPage({
               <col className="w-[11%]" />
               <col className="w-[10%]" />
               <col className="w-[17%]" />
-              <col className="w-[8%]" />
+              {showProjectColumn ? <col className="w-[8%]" /> : null}
               <col className="w-[16%]" />
               <col className="w-[12%]" />
               <col className="w-[12%]" />
@@ -281,7 +436,7 @@ export function SupplierPaymentsPage({
                 <th className="pb-3 font-medium">Payment ID</th>
                 <th className="pb-3 font-medium">Date</th>
                 <th className="pb-3 font-medium">Supplier</th>
-                <th className="pb-3 font-medium">Project</th>
+                {showProjectColumn ? <th className="pb-3 font-medium">Project</th> : null}
                 <th className="pb-3 font-medium">Payment Method</th>
                 <th className="pb-3 font-medium">Paid Amount</th>
                 <th className="pb-3 font-medium">Due Amount</th>
@@ -295,7 +450,7 @@ export function SupplierPaymentsPage({
                   <td className="py-4 font-semibold text-[#2563eb]">{payment.id}</td>
                   <td className="py-4 text-[var(--app-text-muted)]">{payment.date}</td>
                   <td className="py-4 pr-3 break-words">{payment.supplier}</td>
-                  <td className="py-4">{payment.project}</td>
+                  {showProjectColumn ? <td className="py-4">{payment.project}</td> : null}
                   <td className="py-4 break-words">
                     <span className="inline-flex rounded-full bg-[#e2e8f0] px-2.5 py-1 text-[10px] font-medium text-[#64748b]">
                       {payment.paymentMethod}
@@ -322,6 +477,13 @@ export function SupplierPaymentsPage({
                   </td>
                 </tr>
               ))}
+              {payments.length === 0 ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[var(--app-text-muted)]" colSpan={showProjectColumn ? 9 : 8}>
+                    No payments found.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
@@ -356,10 +518,12 @@ export function SupplierPaymentsPage({
                     <div className="text-[10px] uppercase tracking-[0.14em] text-[#8d9ab0]">Supplier</div>
                     <div className="mt-1 text-[#e6ebf4]">{detailsPayment.supplier}</div>
                   </div>
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.14em] text-[#8d9ab0]">Project</div>
-                    <div className="mt-1 text-[#e6ebf4]">{detailsPayment.project}</div>
-                  </div>
+                  {showProjectDetails ? (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#8d9ab0]">Project</div>
+                      <div className="mt-1 text-[#e6ebf4]">{detailsPayment.project}</div>
+                    </div>
+                  ) : null}
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.14em] text-[#8d9ab0]">Total Paid</div>
                     <div className="mt-1 font-semibold text-[#f7a614]">{detailsPayment.totalPaid}</div>
@@ -438,9 +602,11 @@ export function SupplierPaymentsPage({
                     <div>
                       Payment ID: <span className="font-semibold">{invoicePayment.id}</span>
                     </div>
-                    <div>
-                      Project: <span className="font-semibold">{invoicePayment.project}</span>
-                    </div>
+                    {showProjectDetails ? (
+                      <div>
+                        Project: <span className="font-semibold">{invoicePayment.project}</span>
+                      </div>
+                    ) : null}
                     <div>Date: {invoicePayment.date}</div>
                   </div>
                 </div>
@@ -477,12 +643,6 @@ export function SupplierPaymentsPage({
                   </span>
                 </div>
               </div>
-
-              <div className="flex justify-center pt-1">
-                <div className="rounded-md bg-white p-2 shadow-[0_8px_18px_rgba(0,0,0,0.2)]">
-                  <QrMock />
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -499,6 +659,8 @@ export function SupplierPaymentsPage({
             </div>
 
             <form className="space-y-4 px-4 py-4" onSubmit={handleRecordPayment}>
+              {errorMessage ? <div className="rounded-md border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[14px] text-[#f7c8cf]">{errorMessage}</div> : null}
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="block space-y-2">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Supplier *</span>
@@ -511,7 +673,7 @@ export function SupplierPaymentsPage({
                   >
                     <option value="">Select supplier</option>
                     {supplierOptions.map((supplier) => (
-                      <option key={supplier.recordId} value={supplier.name}>
+                      <option key={supplier.recordId} value={supplier.recordId}>
                         {supplier.name}
                       </option>
                     ))}
@@ -520,23 +682,46 @@ export function SupplierPaymentsPage({
 
                 <label className="block space-y-2">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Payment Method *</span>
-                  <input
-                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
+                  <select
+                    className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
                     name="paymentMethod"
                     onChange={handleFormChange}
                     required
-                    type="text"
                     value={formValues.paymentMethod}
-                  />
+                  >
+                    <option value="">Select payment method</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Bank">Bank</option>
+                  </select>
                 </label>
+
+                {showProjectField && projectOptions.length > 0 ? (
+                  <label className="block space-y-2">
+                    <span className="text-[14px] font-medium text-[#d6ddea]">Project *</span>
+                    <select
+                      className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
+                      name="project"
+                      onChange={handleFormChange}
+                      required
+                      value={formValues.project}
+                    >
+                      <option value="">Select project</option>
+                      {projectOptions.map((project) => (
+                        <option key={project.recordId} value={project.recordId}>
+                          {project.id} - {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
 
                 <label className="block space-y-2">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Previous Due Amount (৳) *</span>
                   <input
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
                     name="previousDueAmount"
-                    onChange={handleFormChange}
-                    placeholder="Enter total due amount"
+                    placeholder="Auto-filled from supplier due"
+                    readOnly
                     required
                     type="number"
                     value={formValues.previousDueAmount}
@@ -547,6 +732,8 @@ export function SupplierPaymentsPage({
                   <span className="text-[14px] font-medium text-[#d6ddea]">Paid Amount (৳) *</span>
                   <input
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
+                    max={currentPreviousDue > 0 ? currentPreviousDue : undefined}
+                    min="0"
                     name="paidAmount"
                     onChange={handleFormChange}
                     placeholder="Enter payment amount"
@@ -557,12 +744,21 @@ export function SupplierPaymentsPage({
                 </label>
 
                 <label className="block space-y-2">
+                  <span className="text-[14px] font-medium text-[#d6ddea]">Remaining Due (৳)</span>
+                  <input
+                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] font-medium text-[#ef4444] outline-none"
+                    readOnly
+                    type="text"
+                    value={formatCurrencyNumber(currentRemainingDue)}
+                  />
+                </label>
+
+                <label className="block space-y-2">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Date *</span>
                   <input
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
                     name="date"
-                    onChange={handleFormChange}
-                    placeholder="DD/MM/YYYY"
+                    readOnly
                     required
                     type="text"
                     value={formValues.date}
@@ -570,15 +766,40 @@ export function SupplierPaymentsPage({
                 </label>
               </div>
 
+              {selectedSupplier ? (
+                <div className="rounded-md border border-[#334156] bg-[#243045] px-4 py-4">
+                  <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#9aa6bb]">Supplier Details</div>
+                  <div className="mt-3 grid grid-cols-1 gap-3 text-[13px] text-[#d7deea] md:grid-cols-2">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#8f9ab0]">Supplier ID</div>
+                      <div className="mt-1 font-medium text-[#e6ebf4]">{selectedSupplier.id}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#8f9ab0]">Category</div>
+                      <div className="mt-1">{selectedSupplier.category}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#8f9ab0]">Email</div>
+                      <div className="mt-1 break-all">{selectedSupplier.email}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#8f9ab0]">Phone</div>
+                      <div className="mt-1">{selectedSupplier.phone}</div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="flex justify-end gap-3 border-t border-[#314058] pt-4">
                 <button className="px-2 text-[14px] font-medium text-[#d6ddea] transition hover:text-white" onClick={closeRecordModal} type="button">
                   Cancel
                 </button>
                 <button
                   className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                  disabled={isSubmitting}
                   type="submit"
                 >
-                  Submit Payment
+                  {isSubmitting ? "Submitting..." : "Submit Payment"}
                 </button>
               </div>
             </form>

@@ -176,7 +176,7 @@ export function ExportCostsPage() {
     <section className="w-full min-w-0 space-y-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-[34px] font-semibold leading-none text-[#e6ebf4]">Export Costs</h2>
+          <h2 className="text-[34px] font-semibold leading-none text-[#e6ebf4]">Shipment Costs</h2>
           <p className="mt-3 text-[15px] text-[#8f9cb0]">
             Track international shipping and export expenses with itemized breakdown
           </p>
