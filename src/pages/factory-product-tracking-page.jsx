@@ -6,6 +6,8 @@ import {
   updateFactoryProductEntry,
 } from "@/shared/lib/factory-product-tracking-api";
 import { getProjects } from "@/shared/lib/project-api";
+import { getRawMaterialAllocations } from "@/shared/lib/raw-material-allocation-api";
+import { getSupplierAssignments } from "@/shared/lib/supplier-assignment-api";
 
 function DownloadIcon() {
   return (
@@ -65,6 +67,7 @@ export function FactoryProductTrackingPage() {
   const [entriesLoading, setEntriesLoading] = useState(true);
   const [projectOptions, setProjectOptions] = useState([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
+  const [supplierAssignments, setSupplierAssignments] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -101,15 +104,23 @@ export function FactoryProductTrackingPage() {
 
     async function loadProjects() {
       try {
-        const projects = await getProjects();
+        const [projects, allocations, assignmentRecords] = await Promise.all([
+          getProjects(),
+          getRawMaterialAllocations(),
+          getSupplierAssignments(),
+        ]);
+        const allocatedProjectIds = new Set(allocations.map((allocation) => String(allocation.projectId)));
+        const allocatedProjects = projects.filter((project) => allocatedProjectIds.has(String(project.recordId)));
 
         if (isMounted) {
-          setProjectOptions(projects);
+          setProjectOptions(allocatedProjects);
+          setSupplierAssignments(assignmentRecords);
         }
       } catch (error) {
         if (isMounted) {
           setErrorMessage(error.message);
           setProjectOptions([]);
+          setSupplierAssignments([]);
         }
       } finally {
         if (isMounted) {
@@ -129,13 +140,17 @@ export function FactoryProductTrackingPage() {
   const selectedProject = projectOptions.find((project) => String(project.recordId) === formValues.project);
   const enteredQuantity = toQuantity(formValues.quantityProduced);
   const totalOrderQuantity = toQuantity(selectedProject?.totalOrderQuantity);
-  const supplierProduced = toQuantity(selectedProject?.totalSupplierProduced);
+  const totalSupplierAssigned = selectedProject
+    ? supplierAssignments
+        .filter((assignment) => assignment.projectId === selectedProject.recordId)
+        .reduce((total, assignment) => total + toQuantity(assignment.quantity), 0)
+    : 0;
   const factoryProducedExcludingCurrent = selectedProject
     ? entries
         .filter((entry) => entry.projectRecordId === selectedProject.recordId && entry.recordId !== editingId)
         .reduce((total, entry) => total + toQuantity(entry.quantityProduced), 0)
     : 0;
-  const remainingBeforeEntry = Math.max(totalOrderQuantity - supplierProduced - factoryProducedExcludingCurrent, 0);
+  const remainingBeforeEntry = Math.max(totalOrderQuantity - totalSupplierAssigned - factoryProducedExcludingCurrent, 0);
   const remainingAfterEntry = Math.max(remainingBeforeEntry - enteredQuantity, 0);
   const hasProductionLimit = Boolean(selectedProject) && totalOrderQuantity > 0;
   const isQuantityUnavailable = Boolean(selectedProject) && totalOrderQuantity <= 0;

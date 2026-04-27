@@ -6,6 +6,7 @@ import { DeliveryHistoryPage } from "@/pages/delivery-history-page";
 import { DeliveryShipmentPage } from "@/pages/delivery-shipment-page";
 import { FactoryProductTrackingPage } from "@/pages/factory-product-tracking-page";
 import { FinishedGoodsPage } from "@/pages/finished-goods-page";
+import { GoodsSupplierPaymentsPage } from "@/pages/goods-supplier-payments-page";
 import { InvoicesPage } from "@/pages/invoices-page";
 import { MaterialAllocationPage } from "@/pages/material-allocation-page";
 import { MaterialPurchasePage } from "@/pages/material-purchase-page";
@@ -79,8 +80,12 @@ export function HomePage() {
           return <DeliveryHistoryPage />;
         }
 
-        if (selectedItem === "Supplier Payments") {
+        if (selectedItem === "Supplier Payments" || selectedItem === "Raw Material Supplier Payment" || selectedItem === "Material Supplier Payment") {
           return <SupplierPaymentsPage />;
+        }
+
+        if (selectedItem === "Goods Supplier Payment") {
+          return <GoodsSupplierPaymentsPage />;
         }
 
         if (selectedItem === "Invoices") {

@@ -1,23 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialDeliveries = [
-  {
-    id: "DEL-001",
-    project: "PRJ-002",
-    buyer: "XYZ Ltd",
-    quantity: "300",
-    date: "2026-04-13",
-    delivered: false,
-  },
-  {
-    id: "DEL-002",
-    project: "PRJ-002",
-    buyer: "XYZ Ltd",
-    quantity: "300",
-    date: "2026-04-13",
-    delivered: false,
-  },
-];
+import { getDeliveryShipments, updateDeliveryShipmentStatus } from "@/shared/lib/delivery-shipment-api";
 
 function SearchIcon() {
   return (
@@ -43,47 +26,87 @@ function DownloadIcon() {
   );
 }
 
-function PlusIcon() {
+function RefreshIcon() {
   return (
     <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
-      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
-      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      <path
+        d="M20 12a8 8 0 10-2.34 5.66M20 12v6m0-6h-6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
     </svg>
   );
 }
 
 export function DeliveryShipmentPage() {
-  const [deliveries, setDeliveries] = useState(initialDeliveries);
+  const [deliveries, setDeliveries] = useState([]);
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
-  const [formValues, setFormValues] = useState({
-    project: "",
-    buyer: "",
-    quantity: "",
-    date: "",
-  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [updatingId, setUpdatingId] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDeliveries() {
+      try {
+        const records = await getDeliveryShipments();
+
+        if (isMounted) {
+          setDeliveries(records);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadDeliveries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredDeliveries = deliveries.filter((item) => {
-    const query = search.toLowerCase();
+    if (item.deliveryStatus !== "Not Delivered") {
+      return false;
+    }
+
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return true;
+    }
+
     return (
       item.id.toLowerCase().includes(query) ||
-      item.project.toLowerCase().includes(query) ||
+      item.projectId.toLowerCase().includes(query) ||
       item.buyer.toLowerCase().includes(query) ||
-      item.date.toLowerCase().includes(query)
+      item.product.toLowerCase().includes(query) ||
+      item.date.toLowerCase().includes(query) ||
+      item.deliveryStatus.toLowerCase().includes(query)
     );
   });
 
   function handleExport() {
-    const header = ["Delivery ID", "Project", "Buyer", "Quantity", "Date", "Delivered"];
-    const rows = deliveries.map((item) => [item.id, item.project, item.buyer, item.quantity, item.date, item.delivered ? "Yes" : "No"]);
+    const header = ["Delivery ID", "Project", "Buyer", "Product", "Quantity", "Delivery Date", "Status"];
+    const rows = filteredDeliveries.map((item) => [
+      item.id,
+      item.projectId,
+      item.buyer,
+      item.product,
+      item.quantity,
+      item.date,
+      item.deliveryStatus,
+    ]);
     const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -94,80 +117,34 @@ export function DeliveryShipmentPage() {
     URL.revokeObjectURL(url);
   }
 
-  function openCreateModal() {
-    setSelectedId(null);
-    setFormValues({
-      project: "",
-      buyer: "",
-      quantity: "",
-      date: "",
-    });
-    setIsModalOpen(true);
-  }
+  async function handleRefresh() {
+    setIsLoading(true);
+    setErrorMessage("");
 
-  function openModal(delivery) {
-    setSelectedId(delivery.id);
-    setFormValues({
-      project: delivery.project,
-      buyer: delivery.buyer,
-      quantity: delivery.quantity,
-      date: delivery.date,
-    });
-    setIsModalOpen(true);
-  }
-
-  function closeModal() {
-    setIsModalOpen(false);
-    setSelectedId(null);
-    setFormValues({
-      project: "",
-      buyer: "",
-      quantity: "",
-      date: "",
-    });
-  }
-
-  function handleFormChange(event) {
-    const { name, value } = event.target;
-    setFormValues((current) => ({ ...current, [name]: value }));
-  }
-
-  function handleSubmit(event) {
-    event.preventDefault();
-
-    if (selectedId) {
-      setDeliveries((current) =>
-        current.map((item) =>
-          item.id === selectedId
-            ? {
-                ...item,
-                project: formValues.project,
-                buyer: formValues.buyer,
-                quantity: formValues.quantity,
-                date: formValues.date,
-                delivered: true,
-              }
-            : item,
-        ),
-      );
-    } else {
-      const nextNumber = deliveries.length + 1;
-      const padded = String(nextNumber).padStart(3, "0");
-
-      setDeliveries((current) => [
-        ...current,
-        {
-          id: `DEL-${padded}`,
-          project: formValues.project,
-          buyer: formValues.buyer,
-          quantity: formValues.quantity,
-          date: formValues.date,
-          delivered: true,
-        },
-      ]);
+    try {
+      const records = await getDeliveryShipments(search);
+      setDeliveries(records);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsLoading(false);
     }
+  }
 
-    closeModal();
+  async function handleDeliver(recordId) {
+    setUpdatingId(recordId);
+    setErrorMessage("");
+
+    try {
+      const updatedDelivery = await updateDeliveryShipmentStatus(recordId, "Delivered");
+      setDeliveries((current) =>
+        current.map((item) => (item.recordId === recordId ? updatedDelivery : item)),
+      );
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setUpdatingId(null);
+    }
   }
 
   return (
@@ -175,10 +152,20 @@ export function DeliveryShipmentPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-[34px] font-semibold leading-none text-[#e6ebf4]">Delivery & Shipment</h2>
-          <p className="mt-3 text-[15px] text-[#8f9cb0]">Manage product deliveries and shipments</p>
+          <p className="mt-3 text-[15px] text-[#8f9cb0]">
+            Completed finished goods are automatically added here with default status Not Delivered. Delivered items move to Delivery History.
+          </p>
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-nowrap items-center gap-3 self-start lg:justify-end">
+          <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#4a5a73] px-5 text-[14px] font-medium text-white transition hover:bg-[#4a5a73]/20"
+            onClick={handleRefresh}
+            type="button"
+          >
+            <RefreshIcon />
+            Refresh
+          </button>
           <button
             className="inline-flex h-11 items-center gap-2 rounded-md border border-[#f6a313] px-5 text-[14px] font-medium text-white transition hover:bg-[#f6a313]/10"
             onClick={handleExport}
@@ -187,16 +174,12 @@ export function DeliveryShipmentPage() {
             <DownloadIcon />
             Export
           </button>
-          <button
-            className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
-            onClick={openCreateModal}
-            type="button"
-          >
-            <PlusIcon />
-            Create Delivery
-          </button>
         </div>
       </div>
+
+      {errorMessage ? (
+        <div className="rounded-md border border-[#7f3a3a] bg-[#3a2227] px-4 py-3 text-[14px] text-[#ffd7d7]">{errorMessage}</div>
+      ) : null}
 
       <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
         <label className="flex h-11 items-center gap-3 rounded-md border border-[#334156] bg-[#243045] px-4 text-[#77879d]">
@@ -204,127 +187,97 @@ export function DeliveryShipmentPage() {
           <input
             className="w-full bg-transparent text-[14px] text-[#d6ddea] outline-none placeholder:text-[#77879d]"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search..."
+            placeholder="Search by delivery, project, buyer, product, date or status..."
             type="text"
             value={search}
           />
         </label>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[820px] table-fixed border-collapse text-left">
+        <div className="mt-4 overflow-x-hidden">
+          <table className="w-full table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[16%]" />
+              <col className="w-[20%]" />
+              <col className="w-[10%]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
+              <col className="w-[8%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
-                <th className="w-[14%] pb-3 font-medium">Delivery ID</th>
-                <th className="w-[16%] pb-3 font-medium">Project</th>
-                <th className="w-[18%] pb-3 font-medium">Buyer</th>
-                <th className="w-[16%] pb-3 font-medium">Quantity</th>
-                <th className="w-[16%] pb-3 font-medium">Date</th>
-                <th className="w-[20%] pb-3 font-medium">Action</th>
+                <th className="pb-3 font-medium">Delivery ID</th>
+                <th className="pb-3 font-medium">Project</th>
+                <th className="pb-3 font-medium">Buyer</th>
+                <th className="pb-3 font-medium">Product</th>
+                <th className="pb-3 font-medium">Quantity</th>
+                <th className="pb-3 font-medium">Delivery Date</th>
+                <th className="pb-3 font-medium">Status</th>
+                <th className="pb-3 text-right font-medium">Action</th>
               </tr>
             </thead>
             <tbody>
-              {filteredDeliveries.map((item) => (
-                <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={item.id}>
-                  <td className="py-4 font-semibold text-[#f7a614]">{item.id}</td>
-                  <td className="py-4 font-semibold text-[#d7deea]">{item.project}</td>
-                  <td className="py-4 pr-3">{item.buyer}</td>
-                  <td className="py-4">{item.quantity}</td>
-                  <td className="py-4 text-[#98a5bb]">{item.date}</td>
-                  <td className="py-4">
-                    <button
-                      className={[
-                        "inline-flex min-w-[68px] items-center justify-center rounded-sm px-3 py-1.5 text-[12px] font-medium transition",
-                        item.delivered
-                          ? "bg-[#1f5d35] text-[#d8ffe7] hover:bg-[#267043]"
-                          : "bg-[#f6a313] text-[#111827] hover:bg-[#ffb733]",
-                      ].join(" ")}
-                      onClick={() => openModal(item)}
-                      type="button"
-                    >
-                      {item.delivered ? "Done" : "Deliver"}
-                    </button>
+              {isLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={8}>
+                    Loading delivery shipments...
                   </td>
                 </tr>
-              ))}
+              ) : filteredDeliveries.length > 0 ? (
+                filteredDeliveries.map((item) => {
+                  const isDelivered = item.deliveryStatus === "Delivered";
+                  const isUpdating = updatingId === item.recordId;
+
+                  return (
+                    <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={item.recordId}>
+                      <td className="py-4 font-semibold text-[#f7a614]">{item.id}</td>
+                      <td className="py-4 font-semibold text-[#d7deea]">{item.projectId}</td>
+                      <td className="py-4 pr-3 break-words">{item.buyer}</td>
+                      <td className="py-4 pr-3 break-words">{item.product}</td>
+                      <td className="py-4">{item.quantity}</td>
+                      <td className="py-4 text-[#98a5bb]">{item.date}</td>
+                      <td className="py-4">
+                        <span
+                          className={[
+                            "inline-flex rounded-sm px-2 py-1 text-[11px] font-medium",
+                            isDelivered ? "bg-[#1f5d35] text-[#d8ffe7]" : "bg-[#57411f] text-[#f5b14e]",
+                          ].join(" ")}
+                        >
+                          {item.deliveryStatus}
+                        </span>
+                      </td>
+                      <td className="py-4">
+                        <div className="flex justify-end">
+                          <button
+                            className={[
+                              "inline-flex min-w-[92px] items-center justify-center rounded-sm px-3 py-1.5 text-[12px] font-medium transition",
+                              isDelivered
+                                ? "cursor-not-allowed bg-[#1f5d35] text-[#d8ffe7]"
+                                : "bg-[#f6a313] text-[#111827] hover:bg-[#ffb733]",
+                            ].join(" ")}
+                            disabled={isDelivered || isUpdating}
+                            onClick={() => handleDeliver(item.recordId)}
+                            type="button"
+                          >
+                            {isUpdating ? "Updating..." : isDelivered ? "Delivered" : "Deliver"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={8}>
+                    No pending delivery shipments found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </article>
-
-      {isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0d1422]/70 px-4 py-4">
-          <div className="w-full max-h-[calc(100vh-2rem)] max-w-[520px] overflow-y-auto rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
-            <div className="flex items-center justify-between border-b border-[#314058] px-4 py-4">
-              <h3 className="text-[24px] font-semibold text-[#e6ebf4]">Create Delivery</h3>
-              <button className="text-[#d7deea] transition hover:text-white" onClick={closeModal} type="button">
-                <CloseIcon />
-              </button>
-            </div>
-
-            <form className="space-y-4 px-4 py-4" onSubmit={handleSubmit}>
-              <label className="block space-y-2">
-                <span className="text-[14px] font-medium text-[#d6ddea]">Project *</span>
-                <input
-                  className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
-                  name="project"
-                  onChange={handleFormChange}
-                  required
-                  type="text"
-                  value={formValues.project}
-                />
-              </label>
-
-              <label className="block space-y-2">
-                <span className="text-[14px] font-medium text-[#d6ddea]">Buyer *</span>
-                <input
-                  className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
-                  name="buyer"
-                  onChange={handleFormChange}
-                  required
-                  type="text"
-                  value={formValues.buyer}
-                />
-              </label>
-
-              <label className="block space-y-2">
-                <span className="text-[14px] font-medium text-[#d6ddea]">Quantity *</span>
-                <input
-                  className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
-                  name="quantity"
-                  onChange={handleFormChange}
-                  required
-                  type="number"
-                  value={formValues.quantity}
-                />
-              </label>
-
-              <label className="block space-y-2">
-                <span className="text-[14px] font-medium text-[#d6ddea]">Date *</span>
-                <input
-                  className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
-                  name="date"
-                  onChange={handleFormChange}
-                  required
-                  type="text"
-                  value={formValues.date}
-                />
-              </label>
-
-              <div className="flex justify-end gap-3 border-t border-[#314058] pt-4">
-                <button className="px-2 text-[14px] font-medium text-[#d6ddea] transition hover:text-white" onClick={closeModal} type="button">
-                  Cancel
-                </button>
-                <button
-                  className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
-                  type="submit"
-                >
-                  Done
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

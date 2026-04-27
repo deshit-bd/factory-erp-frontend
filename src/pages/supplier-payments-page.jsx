@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useState,useEffect } from "react";
+
+import { getProjectGoodsSuppliers } from "@/shared/lib/project-goods-supplier-api";
+import { getRawMaterialSuppliers } from "@/shared/lib/raw-material-supplier-api";
 
 const initialPayments = [
   {
@@ -92,19 +95,49 @@ function QrMock() {
   );
 }
 
-export function SupplierPaymentsPage() {
+export function SupplierPaymentsPage({
+  pageTitle = "Supplier Payments",
+  pageDescription = "Track payments with auto invoice generation and due management",
+  exportFileName = "supplier-payments.csv",
+  recordModalTitle = "Record Supplier Payment",
+  supplierOptionsLoader = getRawMaterialSuppliers,
+}) {
   const [payments, setPayments] = useState(initialPayments);
+  const [supplierOptions, setSupplierOptions] = useState([]);
   const [detailsPayment, setDetailsPayment] = useState(null);
   const [invoicePayment, setInvoicePayment] = useState(null);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [formValues, setFormValues] = useState({
     supplier: "",
-    project: "",
     paymentMethod: "",
     previousDueAmount: "",
     paidAmount: "",
     date: "",
   });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSuppliers() {
+      try {
+        const records = await supplierOptionsLoader();
+
+        if (isMounted) {
+          setSupplierOptions(records);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setSupplierOptions([]);
+        }
+      }
+    }
+
+    loadSuppliers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [supplierOptionsLoader]);
 
   const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.totalPaid.replace(/[^\d.-]/g, "")), 0);
   const totalDue = payments.reduce((sum, payment) => sum + Number(payment.remainingDue.replace(/[^\d.-]/g, "")), 0);
@@ -126,7 +159,7 @@ export function SupplierPaymentsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "supplier-payments.csv";
+    link.download = exportFileName;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -134,7 +167,6 @@ export function SupplierPaymentsPage() {
   function openRecordModal() {
     setFormValues({
       supplier: "",
-      project: "",
       paymentMethod: "",
       previousDueAmount: "",
       paidAmount: "",
@@ -147,7 +179,6 @@ export function SupplierPaymentsPage() {
     setIsRecordModalOpen(false);
     setFormValues({
       supplier: "",
-      project: "",
       paymentMethod: "",
       previousDueAmount: "",
       paidAmount: "",
@@ -174,7 +205,7 @@ export function SupplierPaymentsPage() {
         id: `PAY-${padded}`,
         supplierId: `SUP-${padded}`,
         supplier: formValues.supplier,
-        project: formValues.project,
+        project: "N/A",
         status: remaining > 0 ? "Partial" : "Paid",
         totalPaid: `৳${paid.toLocaleString("en-US")}`,
         remainingDue: `৳${remaining.toLocaleString("en-US")}`,
@@ -192,8 +223,8 @@ export function SupplierPaymentsPage() {
     <section className="w-full min-w-0 space-y-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-[18px] font-semibold leading-none text-[var(--app-text)]">Supplier Payments</h2>
-          <p className="mt-2 text-[11px] text-[var(--app-text-muted)]">Track payments with auto invoice generation and due management</p>
+          <h2 className="text-[18px] font-semibold leading-none text-[var(--app-text)]">{pageTitle}</h2>
+          <p className="mt-2 text-[11px] text-[var(--app-text-muted)]">{pageDescription}</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -232,19 +263,30 @@ export function SupplierPaymentsPage() {
       </section>
 
       <article className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
+        <div className="overflow-x-hidden">
+          <table className="w-full table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-[11%]" />
+              <col className="w-[10%]" />
+              <col className="w-[17%]" />
+              <col className="w-[8%]" />
+              <col className="w-[16%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[8%]" />
+              <col className="w-[6%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-[var(--app-border)] text-[10px] uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
-                <th className="w-[11%] pb-3 font-medium">Payment ID</th>
-                <th className="w-[10%] pb-3 font-medium">Date</th>
-                <th className="w-[17%] pb-3 font-medium">Supplier</th>
-                <th className="w-[8%] pb-3 font-medium">Project</th>
-                <th className="w-[16%] pb-3 font-medium">Payment Method</th>
-                <th className="w-[12%] pb-3 font-medium">Paid Amount</th>
-                <th className="w-[12%] pb-3 font-medium">Due Amount</th>
-                <th className="w-[8%] pb-3 font-medium">Status</th>
-                <th className="w-[6%] pb-3 text-right font-medium">Actions</th>
+                <th className="pb-3 font-medium">Payment ID</th>
+                <th className="pb-3 font-medium">Date</th>
+                <th className="pb-3 font-medium">Supplier</th>
+                <th className="pb-3 font-medium">Project</th>
+                <th className="pb-3 font-medium">Payment Method</th>
+                <th className="pb-3 font-medium">Paid Amount</th>
+                <th className="pb-3 font-medium">Due Amount</th>
+                <th className="pb-3 font-medium">Status</th>
+                <th className="pb-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -252,9 +294,9 @@ export function SupplierPaymentsPage() {
                 <tr className="border-b border-[var(--app-border)] text-[13px] text-[var(--app-text)]" key={payment.id}>
                   <td className="py-4 font-semibold text-[#2563eb]">{payment.id}</td>
                   <td className="py-4 text-[var(--app-text-muted)]">{payment.date}</td>
-                  <td className="py-4 pr-3">{payment.supplier}</td>
+                  <td className="py-4 pr-3 break-words">{payment.supplier}</td>
                   <td className="py-4">{payment.project}</td>
-                  <td className="py-4">
+                  <td className="py-4 break-words">
                     <span className="inline-flex rounded-full bg-[#e2e8f0] px-2.5 py-1 text-[10px] font-medium text-[#64748b]">
                       {payment.paymentMethod}
                     </span>
@@ -450,36 +492,30 @@ export function SupplierPaymentsPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0d1422]/70 px-4 py-4">
           <div className="w-full max-h-[calc(100vh-2rem)] max-w-[820px] overflow-y-auto rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-[#314058] px-4 py-4">
-              <h3 className="text-[24px] font-semibold text-[#e6ebf4]">Record Supplier Payment</h3>
+              <h3 className="text-[24px] font-semibold text-[#e6ebf4]">{recordModalTitle}</h3>
               <button className="text-[#d7deea] transition hover:text-white" onClick={closeRecordModal} type="button">
                 <CloseIcon />
               </button>
             </div>
 
             <form className="space-y-4 px-4 py-4" onSubmit={handleRecordPayment}>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="block space-y-2">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Supplier *</span>
-                  <input
-                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
+                  <select
+                    className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
                     name="supplier"
                     onChange={handleFormChange}
                     required
-                    type="text"
                     value={formValues.supplier}
-                  />
-                </label>
-
-                <label className="block space-y-2">
-                  <span className="text-[14px] font-medium text-[#d6ddea]">Project *</span>
-                  <input
-                    className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
-                    name="project"
-                    onChange={handleFormChange}
-                    required
-                    type="text"
-                    value={formValues.project}
-                  />
+                  >
+                    <option value="">Select supplier</option>
+                    {supplierOptions.map((supplier) => (
+                      <option key={supplier.recordId} value={supplier.name}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label className="block space-y-2">

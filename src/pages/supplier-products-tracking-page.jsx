@@ -131,6 +131,11 @@ const emptyFormValues = {
   receiptFile: null,
 };
 
+function toQuantity(value) {
+  const quantity = Number(value);
+  return Number.isFinite(quantity) ? quantity : 0;
+}
+
 export function SupplierProductsTrackingPage() {
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -196,6 +201,38 @@ export function SupplierProductsTrackingPage() {
     transform: `scale(${receiptZoom})`,
     transformOrigin: "top center",
   };
+  const selectedProject = projects.find((project) => String(project.recordId) === formValues.project);
+  const enteredQuantity = toQuantity(formValues.quantitySupplied);
+  const totalOrderQuantity = toQuantity(selectedProject?.totalOrderQuantity);
+  const factoryProduced = toQuantity(selectedProject?.totalFactoryProduced);
+  const assignedSupplierQuantity = selectedSupplier
+    ? supplierAssignments
+        .filter(
+          (assignment) => assignment.supplier === selectedSupplier.name && assignment.projectId === Number(selectedProject?.recordId || 0),
+        )
+        .reduce((total, assignment) => total + toQuantity(assignment.quantity), 0)
+    : 0;
+  const totalSupplierProducedExcludingCurrent = selectedProject
+    ? entries
+        .filter((entry) => entry.projectRecordId === selectedProject.recordId && entry.recordId !== editingRecordId)
+        .reduce((total, entry) => total + toQuantity(entry.quantitySupplied), 0)
+    : 0;
+  const currentSupplierProducedExcludingCurrent = selectedProject
+    ? entries
+        .filter(
+          (entry) =>
+            entry.projectRecordId === selectedProject.recordId &&
+            entry.supplierId === Number(selectedSupplier?.recordId || 0) &&
+            entry.recordId !== editingRecordId,
+        )
+        .reduce((total, entry) => total + toQuantity(entry.quantitySupplied), 0)
+    : 0;
+  const remainingProjectQuantity = Math.max(totalOrderQuantity - factoryProduced - totalSupplierProducedExcludingCurrent, 0);
+  const remainingAssignedQuantity = Math.max(assignedSupplierQuantity - currentSupplierProducedExcludingCurrent, 0);
+  const remainingBeforeEntry = Math.min(remainingProjectQuantity, remainingAssignedQuantity);
+  const isQuantityUnavailable = Boolean(selectedProject) && totalOrderQuantity <= 0;
+  const isSupplierQuantityUnavailable = Boolean(selectedProject && selectedSupplier) && assignedSupplierQuantity <= 0;
+  const isQuantityOverLimit = Boolean(selectedProject && selectedSupplier) && enteredQuantity > remainingBeforeEntry;
 
   function handleExport() {
     const header = ["ID", "Date", "Supplier", "Project ID", "Product", "Quantity Supplied", "Quality Status", "Notes"];
@@ -306,7 +343,21 @@ export function SupplierProductsTrackingPage() {
   function handleSubmit(event) {
     event.preventDefault();
 
-    const selectedProject = projects.find((project) => String(project.recordId) === formValues.project);
+    if (isQuantityUnavailable) {
+      setErrorMessage("No ordered quantity found for this project.");
+      return;
+    }
+
+    if (isSupplierQuantityUnavailable) {
+      setErrorMessage("No supplier assigned quantity found for this project.");
+      return;
+    }
+
+    if (isQuantityOverLimit) {
+      setErrorMessage(`Quantity supplied cannot exceed remaining quantity (${remainingBeforeEntry}).`);
+      return;
+    }
+
     const payload = new FormData();
     payload.append("supplierId", formValues.supplier);
     payload.append("projectId", formValues.project);
@@ -505,18 +556,27 @@ export function SupplierProductsTrackingPage() {
                   />
                 </label>
 
-                <label className="block space-y-2">
-                  <span className="text-[14px] font-medium text-[#d6ddea]">Quantity Supplied *</span>
-                  <input
+              <label className="block space-y-2">
+                <span className="text-[14px] font-medium text-[#d6ddea]">Quantity Supplied *</span>
+                <input
                     className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
                     name="quantitySupplied"
                     onChange={handleFormChange}
                     placeholder="Enter quantity"
                     required
                     type="number"
-                    value={formValues.quantitySupplied}
-                  />
-                </label>
+                  value={formValues.quantitySupplied}
+                />
+                <p className="text-[12px] text-[#9aa6bb]">
+                  {selectedProject
+                    ? isQuantityUnavailable
+                      ? "No ordered quantity found for this project."
+                      : isSupplierQuantityUnavailable
+                        ? "No supplier assigned quantity found for this project."
+                        : `${remainingBeforeEntry} remaining for this supplier.`
+                    : "Select a project to see remaining quantity."}
+                </p>
+              </label>
 
                 <label className="block space-y-2">
                   <span className="text-[14px] font-medium text-[#d6ddea]">Quality Status *</span>
@@ -577,7 +637,7 @@ export function SupplierProductsTrackingPage() {
                 </button>
                 <button
                   className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733] disabled:cursor-not-allowed disabled:opacity-70"
-                  disabled={isSubmitting || pageLoading}
+                  disabled={isSubmitting || pageLoading || isQuantityUnavailable || isSupplierQuantityUnavailable || isQuantityOverLimit}
                   type="submit"
                 >
                   {editingId ? "Save Entry" : "Add Entry"}

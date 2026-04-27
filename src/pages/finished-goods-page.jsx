@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { getFactoryProductEntries } from "@/shared/lib/factory-product-tracking-api";
+import { getProjects } from "@/shared/lib/project-api";
 import { getSupplierProductsTracking } from "@/shared/lib/supplier-products-tracking-api";
 
 function toQuantity(value) {
@@ -16,14 +17,16 @@ function createFinishedGoodKey(projectRecordId, projectId, product) {
   return [projectRecordId || projectId || "project", String(product || "").trim().toLowerCase()].join("::");
 }
 
-function createFinishedGoods(supplierEntries, factoryEntries) {
+function createFinishedGoods(supplierEntries, factoryEntries, projects) {
   const goodsByKey = new Map();
+  const orderQuantityByProjectId = new Map(projects.map((project) => [String(project.recordId), toQuantity(project.totalOrderQuantity)]));
 
   function getGood({ projectRecordId, projectId, product }) {
     const key = createFinishedGoodKey(projectRecordId, projectId, product);
 
     if (!goodsByKey.has(key)) {
       goodsByKey.set(key, {
+        projectRecordId: projectRecordId || "",
         product: product || "Unknown Product",
         project: projectId || "Unknown Project",
         supplierProduction: 0,
@@ -56,6 +59,7 @@ function createFinishedGoods(supplierEntries, factoryEntries) {
 
   return Array.from(goodsByKey.values()).map((item, index) => {
     const totalProduction = item.supplierProduction + item.factoryProduction;
+    const orderQuantity = orderQuantityByProjectId.get(String(item.projectRecordId)) || 0;
 
     return {
       ...item,
@@ -63,8 +67,8 @@ function createFinishedGoods(supplierEntries, factoryEntries) {
       supplierProduction: String(item.supplierProduction),
       factoryProduction: String(item.factoryProduction),
       totalProduction: String(totalProduction),
-      netProduction: String(totalProduction),
-      status: totalProduction > 0 ? "Complete" : "Pending",
+      projectOrderQuantity: String(orderQuantity),
+      status: orderQuantity > 0 && totalProduction === orderQuantity ? "Complete" : "In Progress",
     };
   });
 }
@@ -104,13 +108,14 @@ export function FinishedGoodsPage() {
 
     async function loadFinishedGoods() {
       try {
-        const [supplierEntries, factoryEntries] = await Promise.all([
+        const [supplierEntries, factoryEntries, projects] = await Promise.all([
           getSupplierProductsTracking(),
           getFactoryProductEntries(),
+          getProjects(),
         ]);
 
         if (isMounted) {
-          setGoods(createFinishedGoods(supplierEntries, factoryEntries));
+          setGoods(createFinishedGoods(supplierEntries, factoryEntries, projects));
         }
       } catch (error) {
         if (isMounted) {
@@ -151,7 +156,7 @@ export function FinishedGoodsPage() {
       "Supplier Production",
       "Factory Production",
       "Total Production",
-      "Net Production",
+      "Project Order Quantity",
       "Status",
     ];
     const rows = goods.map((item) => [
@@ -161,7 +166,7 @@ export function FinishedGoodsPage() {
       item.supplierProduction,
       item.factoryProduction,
       item.totalProduction,
-      item.netProduction,
+      item.projectOrderQuantity,
       item.status,
     ]);
     const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
@@ -234,7 +239,7 @@ export function FinishedGoodsPage() {
                 <th className="w-[15%] pb-3 font-medium leading-[1.35]">Supplier Production</th>
                 <th className="w-[15%] pb-3 font-medium leading-[1.35]">Factory Production</th>
                 <th className="w-[13%] pb-3 font-medium leading-[1.35]">Total Production</th>
-                <th className="w-[12%] pb-3 font-medium leading-[1.35]">Net Production</th>
+                <th className="w-[12%] pb-3 font-medium leading-[1.35]">Project Order Quantity</th>
                 <th className="w-[10%] pb-3 text-right font-medium">Status</th>
               </tr>
             </thead>
@@ -254,7 +259,7 @@ export function FinishedGoodsPage() {
                     <td className="py-4">{item.supplierProduction}</td>
                     <td className="py-4">{item.factoryProduction}</td>
                     <td className="py-4 font-semibold text-[#f7a614]">{item.totalProduction}</td>
-                    <td className="py-4 font-semibold text-[#f7a614]">{item.netProduction}</td>
+                    <td className="py-4 font-semibold text-[#f7a614]">{item.projectOrderQuantity}</td>
                     <td className="py-4 text-right">
                       <span
                         className={[

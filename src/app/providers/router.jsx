@@ -8,6 +8,7 @@ import { DeliveryHistoryPage } from "@/pages/delivery-history-page";
 import { DeliveryShipmentPage } from "@/pages/delivery-shipment-page";
 import { FactoryProductTrackingPage } from "@/pages/factory-product-tracking-page";
 import { FinishedGoodsPage } from "@/pages/finished-goods-page";
+import { GoodsSupplierPaymentsPage } from "@/pages/goods-supplier-payments-page";
 import { InvoicesPage } from "@/pages/invoices-page";
 import { MaterialAllocationPage } from "@/pages/material-allocation-page";
 import { MaterialPurchasePage } from "@/pages/material-purchase-page";
@@ -90,6 +91,10 @@ export const router = createBrowserRouter([
       {
         path: "supplier-payments",
         element: <SupplierPaymentsPage />,
+      },
+      {
+        path: "goods-supplier-payments",
+        element: <GoodsSupplierPaymentsPage />,
       },
       {
         path: "invoices",

@@ -1,27 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const initialInvoices = [
-  {
-    id: "INV-001",
-    buyer: "ABC Corp",
-    project: "PRJ-001",
-    amount: "৳60,000",
-    paid: "৳30,000",
-    due: "৳30,000",
-    date: "2026-04-10",
-    status: "Partial",
-  },
-  {
-    id: "INV-002",
-    buyer: "XYZ Ltd",
-    project: "PRJ-002",
-    amount: "৳25,500",
-    paid: "৳25,500",
-    due: "৳0",
-    date: "2026-04-08",
-    status: "Paid",
-  },
-];
+import { createInvoice, getInvoiceFormOptions, getInvoices } from "@/shared/lib/invoice-api";
 
 function DownloadIcon() {
   return (
@@ -99,33 +78,282 @@ function QrMock() {
   );
 }
 
-function Field({ label, name, value, onChange, placeholder = "", type = "text" }) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-[13px] font-medium text-[#d6ddea]">{label}</span>
-      <input
-        className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none placeholder:text-[#7c8aa0]"
-        name={name}
-        onChange={onChange}
-        placeholder={placeholder}
-        type={type}
-        value={value}
-      />
-    </label>
-  );
+const emptyFormValues = {
+  buyerId: "",
+  projectId: "",
+  amount: "",
+  paidAmount: "",
+  date: "",
+};
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function createInvoicePrintMarkup(invoice) {
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(invoice.id)}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #f3f4f6;
+        color: #4b5563;
+      }
+      .sheet {
+        max-width: 800px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 24px;
+        background: #111827;
+        color: #ffffff;
+      }
+      .brand {
+        color: #f7a614;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .muted {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #cbd5e1;
+        line-height: 1.5;
+      }
+      .invoice-badge {
+        text-align: right;
+      }
+      .invoice-title {
+        color: #f7a614;
+        font-size: 24px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .qr {
+        margin-top: 12px;
+        width: 96px;
+        height: 96px;
+        border: 8px solid #fff;
+        background:
+          linear-gradient(90deg, #000 0 20%, transparent 20% 30%, #000 30% 40%, transparent 40% 60%, #000 60% 70%, transparent 70% 80%, #000 80% 100%),
+          linear-gradient(#000 0 20%, transparent 20% 30%, #000 30% 40%, transparent 40% 60%, #000 60% 70%, transparent 70% 80%, #000 80% 100%);
+      }
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 32px;
+        padding: 24px;
+        border-bottom: 1px solid #d6dbe5;
+      }
+      .label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+      .buyer {
+        margin-top: 12px;
+        color: #2563eb;
+        font-weight: 700;
+      }
+      .details {
+        margin-top: 12px;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead tr {
+        background: #eef2f7;
+        color: #64748b;
+        font-size: 11px;
+        text-transform: uppercase;
+      }
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e5e7eb;
+        text-align: left;
+      }
+      th:last-child, td:last-child {
+        text-align: right;
+      }
+      .summary {
+        display: flex;
+        justify-content: flex-end;
+        padding: 24px;
+      }
+      .summary-card {
+        width: 260px;
+        font-size: 14px;
+      }
+      .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .summary-total {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #334155;
+        font-weight: 700;
+      }
+      .accent { color: #f7a614; }
+      .success { color: #22c55e; font-weight: 700; }
+      .danger { color: #ef4444; font-weight: 700; }
+      .footer {
+        border-top: 1px solid #d6dbe5;
+        padding: 20px 24px;
+        text-align: center;
+        font-size: 11px;
+        color: #6b7280;
+      }
+      @media print {
+        body {
+          padding: 0;
+          background: #ffffff;
+        }
+        .sheet {
+          border: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <div class="header">
+        <div>
+          <div class="brand">Factory ERP</div>
+          <div class="muted">
+            Manufacturing &amp; Industrial Solutions<br />
+            Industrial District, NY 10001<br />
+            Phone: +1-234-567-8900<br />
+            Email: contact@factory.com
+          </div>
+        </div>
+        <div class="invoice-badge">
+          <div class="invoice-title">Invoice</div>
+          <div class="qr"></div>
+        </div>
+      </div>
+      <div class="meta">
+        <div>
+          <div class="label">Bill To</div>
+          <div class="buyer">${escapeHtml(invoice.buyer)}</div>
+          <div class="details">Project: ${escapeHtml(invoice.project)}</div>
+        </div>
+        <div>
+          <div class="label">Invoice Details</div>
+          <div class="details">
+            <div>Invoice ID: <strong>${escapeHtml(invoice.id)}</strong></div>
+            <div>Date: <strong>${escapeHtml(invoice.date)}</strong></div>
+            <div>Status: <strong>${escapeHtml(invoice.status)}</strong></div>
+          </div>
+        </div>
+      </div>
+      <div style="padding: 24px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${escapeHtml(invoice.project)}</td>
+              <td>${escapeHtml(invoice.amount)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="summary">
+        <div class="summary-card">
+          <div class="summary-row"><span>Subtotal:</span><span>${escapeHtml(invoice.amount)}</span></div>
+          <div class="summary-row"><span>Tax (0%):</span><span>৳0.00</span></div>
+          <div class="summary-row summary-total"><span>Total:</span><span class="accent">${escapeHtml(invoice.amount)}</span></div>
+          <div class="summary-row"><span>Paid:</span><span class="success">${escapeHtml(invoice.paid)}</span></div>
+          <div class="summary-row"><span>Balance Due:</span><span class="danger">${escapeHtml(invoice.due)}</span></div>
+        </div>
+      </div>
+      <div class="footer">
+        <div>Thank you for your business!</div>
+        <div>Generated by Factory ERP System</div>
+      </div>
+    </div>
+  </body>
+</html>`;
 }
 
 export function InvoicesPage() {
-  const [invoices, setInvoices] = useState(initialInvoices);
+  const [invoices, setInvoices] = useState([]);
+  const [buyers, setBuyers] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState(null);
-  const [formValues, setFormValues] = useState({
-    buyer: "",
-    project: "",
-    amount: "",
-    paid: "",
-    date: "",
-  });
+  const [formValues, setFormValues] = useState(emptyFormValues);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInvoicePage() {
+      try {
+        const [invoiceRecords, formOptions] = await Promise.all([getInvoices(), getInvoiceFormOptions()]);
+
+        if (isMounted) {
+          setInvoices(invoiceRecords);
+          setBuyers(formOptions.buyers);
+          setProjects(formOptions.projects);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setPageLoading(false);
+        }
+      }
+    }
+
+    loadInvoicePage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const selectedBuyer = buyers.find((buyer) => String(buyer.recordId) === formValues.buyerId);
+  const availableProjects = selectedBuyer
+    ? projects.filter((project) => String(project.buyerRecordId) === formValues.buyerId)
+    : [];
+  const selectedProject = availableProjects.find((project) => String(project.recordId) === formValues.projectId);
+  const enteredPaidAmount = Number(formValues.paidAmount || 0);
+  const selectedAmount = Number(selectedProject?.amountValue || 0);
+  const currentDueAmount = Math.max(selectedAmount - enteredPaidAmount, 0);
 
   function handleExport() {
     const header = ["Invoice ID", "Buyer", "Project", "Amount", "Paid", "Due", "Date", "Status"];
@@ -150,47 +378,122 @@ export function InvoicesPage() {
   }
 
   function openCreateModal() {
-    setFormValues({
-      buyer: "",
-      project: "",
-      amount: "",
-      paid: "",
-      date: "",
-    });
+    setErrorMessage("");
+    setFormValues(emptyFormValues);
     setIsCreateOpen(true);
   }
 
   function closeCreateModal() {
     setIsCreateOpen(false);
+    setFormValues(emptyFormValues);
   }
 
   function handleFormChange(event) {
     const { name, value } = event.target;
+
+    if (name === "buyerId") {
+      setFormValues((current) => ({
+        ...current,
+        buyerId: value,
+        projectId: "",
+        amount: "",
+      }));
+      return;
+    }
+
+    if (name === "projectId") {
+      const nextProject = availableProjects.find((project) => String(project.recordId) === value);
+
+      setFormValues((current) => ({
+        ...current,
+        projectId: value,
+        amount: nextProject?.amountFormatted || "",
+      }));
+      return;
+    }
+
     setFormValues((current) => ({ ...current, [name]: value }));
   }
 
-  function handleCreateInvoice(event) {
+  function openInvoicePrintWindow(invoice, autoPrint = true) {
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+
+    if (!printWindow) {
+      setErrorMessage("Please allow popups to print or download the invoice.");
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(createInvoicePrintMarkup(invoice));
+    printWindow.document.close();
+
+    if (autoPrint) {
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+      };
+    }
+  }
+
+  function handlePrintInvoice() {
+    if (!previewInvoice) {
+      return;
+    }
+
+    openInvoicePrintWindow(previewInvoice, true);
+  }
+
+  function handleDownloadInvoicePdf() {
+    if (!previewInvoice) {
+      return;
+    }
+
+    openInvoicePrintWindow(previewInvoice, true);
+  }
+
+  async function handleCreateInvoice(event) {
     event.preventDefault();
-    const nextNumber = invoices.length + 1;
-    const padded = String(nextNumber).padStart(3, "0");
-    const amount = Number(formValues.amount || 0);
-    const paid = Number(formValues.paid || 0);
-    const due = Math.max(amount - paid, 0);
 
-    const nextInvoice = {
-      id: `INV-${padded}`,
-      buyer: formValues.buyer,
-      project: formValues.project,
-      amount: `৳${amount.toLocaleString("en-US")}`,
-      paid: `৳${paid.toLocaleString("en-US")}`,
-      due: `৳${due.toLocaleString("en-US")}`,
-      date: formValues.date,
-      status: due > 0 ? "Partial" : "Paid",
-    };
+    if (!selectedBuyer) {
+      setErrorMessage("Please select a buyer.");
+      return;
+    }
 
-    setInvoices((current) => [...current, nextInvoice]);
-    setIsCreateOpen(false);
-    setPreviewInvoice(nextInvoice);
+    if (!selectedProject) {
+      setErrorMessage("Please select a project.");
+      return;
+    }
+
+    if (enteredPaidAmount < 0) {
+      setErrorMessage("Paid amount cannot be negative.");
+      return;
+    }
+
+    if (enteredPaidAmount > selectedAmount) {
+      setErrorMessage("Paid amount cannot exceed the auto-filled amount.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      const newInvoice = await createInvoice({
+        buyerId: formValues.buyerId,
+        projectId: formValues.projectId,
+        paidAmount: formValues.paidAmount || "0",
+        date: formValues.date,
+      });
+
+      setInvoices((current) => [newInvoice, ...current]);
+      setIsCreateOpen(false);
+      setPreviewInvoice(newInvoice);
+      setFormValues(emptyFormValues);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -198,7 +501,7 @@ export function InvoicesPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-[18px] font-semibold leading-none text-[#e6ebf4]">Invoices</h2>
-          <p className="mt-2 text-[11px] text-[#8f9cb0]">Create and manage customer invoices</p>
+          <p className="mt-2 text-[11px] text-[#8f9cb0]">Buyer and project come from the database, and due is saved automatically.</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -221,51 +524,78 @@ export function InvoicesPage() {
         </div>
       </div>
 
+      {errorMessage ? <div className="rounded-md border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[14px] text-[#f7c8cf]">{errorMessage}</div> : null}
+
       <article className="rounded-md border border-[#314058] bg-[#222d40] px-4 py-4">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
+        <div className="overflow-x-hidden">
+          <table className="w-full table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-[12%]" />
+              <col className="w-[14%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[13%]" />
+              <col className="w-[10%]" />
+              <col className="w-[7%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
-                <th className="w-[12%] pb-3 font-medium">Invoice ID</th>
-                <th className="w-[12%] pb-3 font-medium">Buyer</th>
-                <th className="w-[10%] pb-3 font-medium">Project</th>
-                <th className="w-[10%] pb-3 font-medium">Amount</th>
-                <th className="w-[10%] pb-3 font-medium">Paid</th>
-                <th className="w-[10%] pb-3 font-medium">Due</th>
-                <th className="w-[14%] pb-3 font-medium">Date</th>
-                <th className="w-[12%] pb-3 font-medium">Status</th>
-                <th className="w-[10%] pb-3 text-right font-medium">Actions</th>
+                <th className="pb-3 font-medium">Invoice ID</th>
+                <th className="pb-3 font-medium">Buyer</th>
+                <th className="pb-3 font-medium">Project</th>
+                <th className="pb-3 font-medium">Amount</th>
+                <th className="pb-3 font-medium">Paid</th>
+                <th className="pb-3 font-medium">Due</th>
+                <th className="pb-3 font-medium">Date</th>
+                <th className="pb-3 font-medium">Status</th>
+                <th className="pb-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {invoices.map((invoice) => (
-                <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={invoice.id}>
-                  <td className="py-4 font-semibold text-[#f7a614]">{invoice.id}</td>
-                  <td className="py-4">{invoice.buyer}</td>
-                  <td className="py-4">{invoice.project}</td>
-                  <td className="py-4 text-[#d7deea]">{invoice.amount}</td>
-                  <td className="py-4 font-semibold text-[#f7a614]">{invoice.paid}</td>
-                  <td className="py-4 font-semibold text-[#ef4444]">{invoice.due}</td>
-                  <td className="py-4 text-[#98a5bb]">{invoice.date}</td>
-                  <td className="py-4">
-                    <span className="inline-flex rounded-sm bg-[#57411f] px-2 py-1 text-[11px] font-medium text-[#f5b14e]">
-                      {invoice.status}
-                    </span>
-                  </td>
-                  <td className="py-4">
-                    <div className="flex justify-end">
-                      <button
-                        className="inline-flex items-center gap-1 text-[#d7deea] transition hover:text-white"
-                        onClick={() => setPreviewInvoice(invoice)}
-                        type="button"
-                      >
-                        <EyeIcon />
-                        <span className="sr-only">View invoice preview</span>
-                      </button>
-                    </div>
+              {pageLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={9}>
+                    Loading invoices...
                   </td>
                 </tr>
-              ))}
+              ) : invoices.length > 0 ? (
+                invoices.map((invoice) => (
+                  <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={invoice.recordId}>
+                    <td className="py-4 font-semibold text-[#f7a614]">{invoice.id}</td>
+                    <td className="py-4 break-words">{invoice.buyer}</td>
+                    <td className="py-4">{invoice.project}</td>
+                    <td className="py-4 text-[#d7deea]">{invoice.amount}</td>
+                    <td className="py-4 font-semibold text-[#f7a614]">{invoice.paid}</td>
+                    <td className="py-4 font-semibold text-[#ef4444]">{invoice.due}</td>
+                    <td className="py-4 text-[#98a5bb]">{invoice.date}</td>
+                    <td className="py-4">
+                      <span className="inline-flex rounded-sm bg-[#57411f] px-2 py-1 text-[11px] font-medium text-[#f5b14e]">
+                        {invoice.status}
+                      </span>
+                    </td>
+                    <td className="py-4">
+                      <div className="flex justify-end">
+                        <button
+                          className="inline-flex items-center gap-1 text-[#d7deea] transition hover:text-white"
+                          onClick={() => setPreviewInvoice(invoice)}
+                          type="button"
+                        >
+                          <EyeIcon />
+                          <span className="sr-only">View invoice preview</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={9}>
+                    No invoices found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -282,21 +612,93 @@ export function InvoicesPage() {
             </div>
 
             <form className="space-y-4 px-4 py-4" onSubmit={handleCreateInvoice}>
-              <Field label="Buyer *" name="buyer" onChange={handleFormChange} value={formValues.buyer} />
-              <Field label="Project *" name="project" onChange={handleFormChange} value={formValues.project} />
-              <Field label="Amount (৳) *" name="amount" onChange={handleFormChange} type="number" value={formValues.amount} />
-              <Field label="Paid (৳)" name="paid" onChange={handleFormChange} type="number" value={formValues.paid} />
-              <Field label="Date *" name="date" onChange={handleFormChange} placeholder="YYYY-MM-DD" value={formValues.date} />
+              <label className="block space-y-2">
+                <span className="text-[13px] font-medium text-[#d6ddea]">Buyer *</span>
+                <select
+                  className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
+                  name="buyerId"
+                  onChange={handleFormChange}
+                  required
+                  value={formValues.buyerId}
+                >
+                  <option value="">Select buyer</option>
+                  {buyers.map((buyer) => (
+                    <option key={buyer.recordId} value={buyer.recordId}>
+                      {buyer.company}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-[13px] font-medium text-[#d6ddea]">Project *</span>
+                <select
+                  className="h-11 w-full appearance-none rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
+                  name="projectId"
+                  onChange={handleFormChange}
+                  required
+                  value={formValues.projectId}
+                >
+                  <option value="">Select project</option>
+                  {availableProjects.map((project) => (
+                    <option key={project.recordId} value={project.recordId}>
+                      {project.id} - {project.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-[13px] font-medium text-[#d6ddea]">Amount (৳) *</span>
+                <input
+                  className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
+                  name="amount"
+                  readOnly
+                  type="text"
+                  value={formValues.amount || selectedProject?.amountFormatted || ""}
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-[13px] font-medium text-[#d6ddea]">Paid (৳)</span>
+                <input
+                  className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
+                  min="0"
+                  name="paidAmount"
+                  onChange={handleFormChange}
+                  step="0.01"
+                  type="number"
+                  value={formValues.paidAmount}
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-[13px] font-medium text-[#d6ddea]">Date *</span>
+                <input
+                  className="h-11 w-full rounded-md border border-[#334156] bg-[#243045] px-4 text-[14px] text-[#e6ebf4] outline-none"
+                  name="date"
+                  onChange={handleFormChange}
+                  required
+                  type="date"
+                  value={formValues.date}
+                />
+              </label>
+
+              <div className="rounded-md border border-[#334156] bg-[#243045] px-4 py-3 text-[13px] text-[#c3ccda]">
+                <div>Selected buyer previous due: {selectedBuyer?.previousDueFormatted || "৳0"}</div>
+                <div className="mt-1">This invoice due to save: ৳{currentDueAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })}</div>
+              </div>
 
               <div className="flex justify-end gap-3 border-t border-[#314058] pt-4">
                 <button className="px-2 text-[14px] font-medium text-[#d6ddea] transition hover:text-white" onClick={closeCreateModal} type="button">
                   Close
                 </button>
                 <button
-                  className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                  className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isSubmitting}
                   type="submit"
                 >
-                  Create Invoice
+                  {isSubmitting ? "Creating..." : "Create Invoice"}
                 </button>
               </div>
             </form>
@@ -307,17 +709,25 @@ export function InvoicesPage() {
       {previewInvoice ? (
         <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[#0d1422]/82 px-4 py-4">
           <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-[600px] flex-col overflow-hidden rounded-md border border-[#314058] bg-[#f3f4f6] shadow-[0_30px_80px_rgba(0,0,0,0.5)]">
-            <div className="flex items-center justify-between border-b border-[#cfd5df] bg-[#f3f4f6] px-4 py-3">
+            <div className="flex flex-col gap-3 border-b border-[#cfd5df] bg-[#f3f4f6] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-[18px] font-medium text-[#3b4454]">Invoice Preview</h3>
-              <div className="flex items-center gap-2">
-                <button className="rounded bg-[#475569] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[#5a6a7f]" type="button">
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+                <button
+                  className="inline-flex h-10 min-w-[96px] items-center justify-center rounded-md bg-[#475569] px-4 text-[12px] font-medium text-white transition hover:bg-[#5a6a7f]"
+                  onClick={handlePrintInvoice}
+                  type="button"
+                >
                   Print
                 </button>
-                <button className="rounded bg-[#f6a313] px-4 py-2 text-[12px] font-medium text-[#111827] transition hover:bg-[#ffb733]" type="button">
+                <button
+                  className="inline-flex h-10 min-w-[128px] items-center justify-center rounded-md bg-[#f6a313] px-4 text-[12px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                  onClick={handleDownloadInvoicePdf}
+                  type="button"
+                >
                   Download PDF
                 </button>
                 <button
-                  className="rounded bg-[#475569] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[#5a6a7f]"
+                  className="inline-flex h-10 min-w-[96px] items-center justify-center rounded-md bg-[#475569] px-4 text-[12px] font-medium text-white transition hover:bg-[#5a6a7f]"
                   onClick={() => setPreviewInvoice(null)}
                   type="button"
                 >
@@ -414,7 +824,7 @@ export function InvoicesPage() {
 
                 <div className="border-t border-[#d6dbe5] px-4 py-5 text-center text-[11px] text-[#6b7280]">
                   <div>Thank you for your business!</div>
-                  <div>Generated by Factory ERP System on 4/18/2026</div>
+                  <div>Generated by Factory ERP System</div>
                 </div>
               </div>
             </div>
