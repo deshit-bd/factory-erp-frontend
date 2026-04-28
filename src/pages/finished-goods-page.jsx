@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { getFactoryProductEntries } from "@/shared/lib/factory-product-tracking-api";
 import { getProjects } from "@/shared/lib/project-api";
 import { getSupplierProductsTracking } from "@/shared/lib/supplier-products-tracking-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function toQuantity(value) {
   const quantity = Number(value);
@@ -100,6 +102,8 @@ function DownloadIcon() {
 export function FinishedGoodsPage() {
   const [search, setSearch] = useState("");
   const [goods, setGoods] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [goodsLoading, setGoodsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -144,39 +148,43 @@ export function FinishedGoodsPage() {
       item.status.toLowerCase().includes(query)
     );
   });
+  const paginatedGoods = getPaginatedRows(filteredGoods, currentPage, pageSize);
 
   const totalProjects = new Set(goods.map((item) => item.project)).size;
   const inStock = goods.filter((item) => item.status === "Complete").length;
 
   function handleExport() {
-    const header = [
-      "ID",
-      "Product",
-      "Project",
-      "Supplier Production",
-      "Factory Production",
-      "Total Production",
-      "Project Order Quantity",
-      "Status",
-    ];
-    const rows = goods.map((item) => [
-      item.id,
-      item.product,
-      item.project,
-      item.supplierProduction,
-      item.factoryProduction,
-      item.totalProduction,
-      item.projectOrderQuantity,
-      item.status,
-    ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "finished-goods-inventory.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile(
+      "finished-goods-inventory.csv",
+      ["ID", "Product", "Project", "Supplier Production", "Factory Production", "Total Production", "Project Order Quantity", "Status"],
+      filteredGoods.map((item) => [
+        item.id,
+        item.product,
+        item.project,
+        item.supplierProduction,
+        item.factoryProduction,
+        item.totalProduction,
+        item.projectOrderQuantity,
+        item.status,
+      ]),
+    );
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Finished Goods Inventory",
+      columns: ["ID", "Product", "Project", "Supplier Production", "Factory Production", "Total Production", "Project Order Quantity", "Status"],
+      rows: filteredGoods.map((item) => [
+        item.id,
+        item.product,
+        item.project,
+        item.supplierProduction,
+        item.factoryProduction,
+        item.totalProduction,
+        item.projectOrderQuantity,
+        item.status,
+      ]),
+    });
   }
 
   return (
@@ -197,6 +205,14 @@ export function FinishedGoodsPage() {
           >
             <DownloadIcon />
             Export
+          </button>
+          <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
           </button>
         </div>
       </div>
@@ -251,7 +267,7 @@ export function FinishedGoodsPage() {
                   </td>
                 </tr>
               ) : filteredGoods.length > 0 ? (
-                filteredGoods.map((item) => (
+                paginatedGoods.rows.map((item) => (
                   <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={item.id}>
                     <td className="py-4 font-semibold text-[#f7a614]">{item.id}</td>
                     <td className="py-4 pr-3">{item.product}</td>
@@ -282,6 +298,20 @@ export function FinishedGoodsPage() {
             </tbody>
           </table>
         </div>
+
+        {!goodsLoading ? (
+          <TablePagination
+            currentPage={paginatedGoods.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedGoods.pageSize}
+            totalItems={paginatedGoods.totalItems}
+            totalPages={paginatedGoods.totalPages}
+          />
+        ) : null}
       </article>
     </section>
   );

@@ -6,6 +6,8 @@ import {
   getProjectGoodsSuppliers,
   updateProjectGoodsSupplier,
 } from "@/shared/lib/project-goods-supplier-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function SearchIcon() {
   return (
@@ -124,6 +126,8 @@ export function SuppliersPage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formValues, setFormValues] = useState(emptyFormValues);
@@ -167,6 +171,7 @@ export function SuppliersPage() {
 
     return matchesSearch && isWithinDateRange(supplier.createdAt, dateFrom, dateTo);
   });
+  const paginatedSuppliers = getPaginatedRows(filteredSuppliers, currentPage, pageSize);
 
   function handleExport() {
     const header = ["ID", "Name", "Category", "Email", "Phone", "Rating"];
@@ -178,14 +183,15 @@ export function SuppliersPage() {
       supplier.phone,
       supplier.rating,
     ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "project-goods-suppliers.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile("project-goods-suppliers.csv", header, rows);
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Project Goods Supplier",
+      columns: ["ID", "Name", "Category", "Email", "Phone", "Rating"],
+      rows: filteredSuppliers.map((supplier) => [supplier.id, supplier.name, supplier.category, supplier.email, supplier.phone, supplier.rating]),
+    });
   }
 
   function openAddSupplierModal() {
@@ -271,6 +277,14 @@ export function SuppliersPage() {
             Export
           </button>
           <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
+          </button>
+          <button
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
             onClick={openAddSupplierModal}
             type="button"
@@ -353,7 +367,7 @@ export function SuppliersPage() {
                   </td>
                 </tr>
               ) : (
-                filteredSuppliers.map((supplier) => (
+                paginatedSuppliers.rows.map((supplier) => (
                   <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={supplier.recordId}>
                     <td className="truncate py-4 pr-3 font-semibold text-[#f7a614]">{supplier.id}</td>
                     <td className="truncate py-4 pr-3">{supplier.name}</td>
@@ -386,6 +400,20 @@ export function SuppliersPage() {
             </tbody>
           </table>
         </div>
+
+        {!suppliersLoading && filteredSuppliers.length > 0 ? (
+          <TablePagination
+            currentPage={paginatedSuppliers.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedSuppliers.pageSize}
+            totalItems={paginatedSuppliers.totalItems}
+            totalPages={paginatedSuppliers.totalPages}
+          />
+        ) : null}
       </article>
 
       {isAddSupplierModalOpen ? (

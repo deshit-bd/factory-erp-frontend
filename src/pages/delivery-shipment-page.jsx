@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { getDeliveryShipments, updateDeliveryShipmentStatus } from "@/shared/lib/delivery-shipment-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function SearchIcon() {
   return (
@@ -43,6 +45,8 @@ function RefreshIcon() {
 export function DeliveryShipmentPage() {
   const [deliveries, setDeliveries] = useState([]);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
@@ -95,26 +99,22 @@ export function DeliveryShipmentPage() {
       item.deliveryStatus.toLowerCase().includes(query)
     );
   });
+  const paginatedDeliveries = getPaginatedRows(filteredDeliveries, currentPage, pageSize);
 
   function handleExport() {
-    const header = ["Delivery ID", "Project", "Buyer", "Product", "Quantity", "Delivery Date", "Status"];
-    const rows = filteredDeliveries.map((item) => [
-      item.id,
-      item.projectId,
-      item.buyer,
-      item.product,
-      item.quantity,
-      item.date,
-      item.deliveryStatus,
-    ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "delivery-shipment.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile(
+      "delivery-shipment.csv",
+      ["Delivery ID", "Project", "Buyer", "Product", "Quantity", "Delivery Date", "Status"],
+      filteredDeliveries.map((item) => [item.id, item.projectId, item.buyer, item.product, item.quantity, item.date, item.deliveryStatus]),
+    );
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Delivery & Shipment",
+      columns: ["Delivery ID", "Project", "Buyer", "Product", "Quantity", "Delivery Date", "Status"],
+      rows: filteredDeliveries.map((item) => [item.id, item.projectId, item.buyer, item.product, item.quantity, item.date, item.deliveryStatus]),
+    });
   }
 
   async function handleRefresh() {
@@ -174,6 +174,14 @@ export function DeliveryShipmentPage() {
             <DownloadIcon />
             Export
           </button>
+          <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
+          </button>
         </div>
       </div>
 
@@ -225,7 +233,7 @@ export function DeliveryShipmentPage() {
                   </td>
                 </tr>
               ) : filteredDeliveries.length > 0 ? (
-                filteredDeliveries.map((item) => {
+                paginatedDeliveries.rows.map((item) => {
                   const isDelivered = item.deliveryStatus === "Delivered";
                   const isUpdating = updatingId === item.recordId;
 
@@ -277,6 +285,20 @@ export function DeliveryShipmentPage() {
             </tbody>
           </table>
         </div>
+
+        {!isLoading ? (
+          <TablePagination
+            currentPage={paginatedDeliveries.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedDeliveries.pageSize}
+            totalItems={paginatedDeliveries.totalItems}
+            totalPages={paginatedDeliveries.totalPages}
+          />
+        ) : null}
       </article>
     </section>
   );

@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 
+import { getCompanyInfo } from "@/shared/lib/accounts-api";
 import { createInvoice, getInvoiceFormOptions, getInvoices } from "@/shared/lib/invoice-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function DownloadIcon() {
   return (
@@ -81,9 +84,15 @@ function QrMock() {
 const emptyFormValues = {
   buyerId: "",
   projectId: "",
-  amount: "",
   paidAmount: "",
   date: "",
+};
+
+const defaultCompanyInfo = {
+  companyName: "Factory ERP",
+  email: "",
+  phone: "",
+  address: "",
 };
 
 function escapeHtml(value) {
@@ -95,7 +104,12 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function createInvoicePrintMarkup(invoice) {
+function createInvoicePrintMarkup(invoice, companyInfo) {
+  const companyName = companyInfo?.companyName || defaultCompanyInfo.companyName;
+  const companyAddress = companyInfo?.address || "";
+  const companyPhone = companyInfo?.phone || "";
+  const companyEmail = companyInfo?.email || "";
+
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -243,13 +257,10 @@ function createInvoicePrintMarkup(invoice) {
     <div class="sheet">
       <div class="header">
         <div>
-          <div class="brand">Factory ERP</div>
-          <div class="muted">
-            Manufacturing &amp; Industrial Solutions<br />
-            Industrial District, NY 10001<br />
-            Phone: +1-234-567-8900<br />
-            Email: contact@factory.com
-          </div>
+          <div class="brand">${escapeHtml(companyName)}</div>
+          <div class="muted">${companyAddress ? `${escapeHtml(companyAddress)}<br />` : ""}${companyPhone ? `Phone: ${escapeHtml(companyPhone)}<br />` : ""}${
+            companyEmail ? `Email: ${escapeHtml(companyEmail)}` : ""
+          }</div>
         </div>
         <div class="invoice-badge">
           <div class="invoice-title">Invoice</div>
@@ -309,11 +320,14 @@ export function InvoicesPage() {
   const [invoices, setInvoices] = useState([]);
   const [buyers, setBuyers] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [companyInfo, setCompanyInfo] = useState(defaultCompanyInfo);
   const [pageLoading, setPageLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [formValues, setFormValues] = useState(emptyFormValues);
 
   useEffect(() => {
@@ -321,12 +335,18 @@ export function InvoicesPage() {
 
     async function loadInvoicePage() {
       try {
-        const [invoiceRecords, formOptions] = await Promise.all([getInvoices(), getInvoiceFormOptions()]);
+        const [invoiceRecords, formOptions, companyInfoResponse] = await Promise.all([getInvoices(), getInvoiceFormOptions(), getCompanyInfo()]);
 
         if (isMounted) {
           setInvoices(invoiceRecords);
           setBuyers(formOptions.buyers);
           setProjects(formOptions.projects);
+          setCompanyInfo({
+            companyName: companyInfoResponse?.companyName || defaultCompanyInfo.companyName,
+            email: companyInfoResponse?.email || "",
+            phone: companyInfoResponse?.phone || "",
+            address: companyInfoResponse?.address || "",
+          });
         }
       } catch (error) {
         if (isMounted) {
@@ -348,12 +368,18 @@ export function InvoicesPage() {
 
   const selectedBuyer = buyers.find((buyer) => String(buyer.recordId) === formValues.buyerId);
   const availableProjects = selectedBuyer
-    ? projects.filter((project) => String(project.buyerRecordId) === formValues.buyerId)
+    ? projects.filter((project) => String(project.buyerRecordId) === formValues.buyerId && Number(project.amountValue || 0) > 0)
     : [];
   const selectedProject = availableProjects.find((project) => String(project.recordId) === formValues.projectId);
   const enteredPaidAmount = Number(formValues.paidAmount || 0);
   const selectedAmount = Number(selectedProject?.amountValue || 0);
-  const currentDueAmount = Math.max(selectedAmount - enteredPaidAmount, 0);
+  const selectedProjectDisplayAmount = selectedProject?.amountFormatted || "৳0";
+  const selectedProjectAmountHelper = selectedProject
+    ? selectedProject.invoiceSource === "due"
+      ? `This invoice will be recreated from outstanding due: ${selectedProject.totalDueAmountFormatted || "৳0"}.`
+      : `This invoice will be created from remaining uninvoiced amount: ${selectedProject.amountFormatted || "৳0"}.`
+    : "";
+  const paginatedInvoices = getPaginatedRows(invoices, currentPage, pageSize);
 
   function handleExport() {
     const header = ["Invoice ID", "Buyer", "Project", "Amount", "Paid", "Due", "Date", "Status"];
@@ -367,14 +393,15 @@ export function InvoicesPage() {
       invoice.date,
       invoice.status,
     ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "invoices.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile("invoices.csv", header, rows);
+  }
+
+  function handleDownloadTablePdf() {
+    openTablePdfWindow({
+      title: "Invoices",
+      columns: ["Invoice ID", "Buyer", "Project", "Amount", "Paid", "Due", "Date", "Status"],
+      rows: invoices.map((invoice) => [invoice.id, invoice.buyer, invoice.project, invoice.amount, invoice.paid, invoice.due, invoice.date, invoice.status]),
+    });
   }
 
   function openCreateModal() {
@@ -396,18 +423,16 @@ export function InvoicesPage() {
         ...current,
         buyerId: value,
         projectId: "",
-        amount: "",
+        paidAmount: "",
       }));
       return;
     }
 
     if (name === "projectId") {
-      const nextProject = availableProjects.find((project) => String(project.recordId) === value);
-
       setFormValues((current) => ({
         ...current,
         projectId: value,
-        amount: nextProject?.amountFormatted || "",
+        paidAmount: "",
       }));
       return;
     }
@@ -424,7 +449,7 @@ export function InvoicesPage() {
     }
 
     printWindow.document.open();
-    printWindow.document.write(createInvoicePrintMarkup(invoice));
+    printWindow.document.write(createInvoicePrintMarkup(invoice, companyInfo));
     printWindow.document.close();
 
     if (autoPrint) {
@@ -470,7 +495,7 @@ export function InvoicesPage() {
     }
 
     if (enteredPaidAmount > selectedAmount) {
-      setErrorMessage("Paid amount cannot exceed the auto-filled amount.");
+      setErrorMessage("Paid amount cannot exceed the remaining invoice amount.");
       return;
     }
 
@@ -512,6 +537,14 @@ export function InvoicesPage() {
           >
             <DownloadIcon />
             Export
+          </button>
+          <button
+            className="inline-flex items-center gap-2 rounded-[6px] border border-[#334156] px-5 py-3 text-[12px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadTablePdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
           </button>
           <button
             className="inline-flex items-center gap-2 rounded-[6px] bg-[#f6a313] px-5 py-3 text-[12px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
@@ -561,7 +594,7 @@ export function InvoicesPage() {
                   </td>
                 </tr>
               ) : invoices.length > 0 ? (
-                invoices.map((invoice) => (
+                paginatedInvoices.rows.map((invoice) => (
                   <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={invoice.recordId}>
                     <td className="py-4 font-semibold text-[#f7a614]">{invoice.id}</td>
                     <td className="py-4 break-words">{invoice.buyer}</td>
@@ -599,6 +632,20 @@ export function InvoicesPage() {
             </tbody>
           </table>
         </div>
+
+        {!pageLoading && invoices.length > 0 ? (
+          <TablePagination
+            currentPage={paginatedInvoices.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedInvoices.pageSize}
+            totalItems={paginatedInvoices.totalItems}
+            totalPages={paginatedInvoices.totalPages}
+          />
+        ) : null}
       </article>
 
       {isCreateOpen ? (
@@ -639,13 +686,18 @@ export function InvoicesPage() {
                   required
                   value={formValues.projectId}
                 >
-                  <option value="">Select project</option>
+                  <option value="">{selectedBuyer ? "Select project" : "Select project"}</option>
                   {availableProjects.map((project) => (
                     <option key={project.recordId} value={project.recordId}>
                       {project.id} - {project.name}
                     </option>
                   ))}
                 </select>
+                {selectedBuyer && availableProjects.length === 0 ? (
+                  <p className="text-[12px] text-[#f7c8cf]">
+                    No projects currently have invoiceable remaining amount or transferable due.
+                  </p>
+                ) : null}
               </label>
 
               <label className="block space-y-2">
@@ -655,8 +707,14 @@ export function InvoicesPage() {
                   name="amount"
                   readOnly
                   type="text"
-                  value={formValues.amount || selectedProject?.amountFormatted || ""}
+                  value={selectedProjectDisplayAmount}
                 />
+                {selectedProject ? (
+                  <p className="text-[12px] text-[#8f9cb0]">
+                    {selectedProjectAmountHelper} Total order: {selectedProject.totalOrderAmountFormatted || "৳0"}. Already invoiced:{" "}
+                    {selectedProject.totalInvoicedAmountFormatted || "৳0"}.
+                  </p>
+                ) : null}
               </label>
 
               <label className="block space-y-2">
@@ -683,11 +741,6 @@ export function InvoicesPage() {
                   value={formValues.date}
                 />
               </label>
-
-              <div className="rounded-md border border-[#334156] bg-[#243045] px-4 py-3 text-[13px] text-[#c3ccda]">
-                <div>Selected buyer previous due: {selectedBuyer?.previousDueFormatted || "৳0"}</div>
-                <div className="mt-1">This invoice due to save: ৳{currentDueAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })}</div>
-              </div>
 
               <div className="flex justify-end gap-3 border-t border-[#314058] pt-4">
                 <button className="px-2 text-[14px] font-medium text-[#d6ddea] transition hover:text-white" onClick={closeCreateModal} type="button">
@@ -737,14 +790,13 @@ export function InvoicesPage() {
             </div>
 
             <div className="overflow-y-auto bg-white p-4 text-[#4b5563]">
-              <div className="border border-[#334155]">
-                <div className="flex items-start justify-between bg-[#111827] px-4 py-6 text-white">
-                  <div>
-                    <div className="text-[18px] font-semibold uppercase tracking-[0.04em] text-[#f7a614]">Factory ERP</div>
-                    <div className="mt-2 text-[11px] text-[#cbd5e1]">Manufacturing & Industrial Solutions</div>
-                    <div className="text-[11px] text-[#cbd5e1]">Industrial District, NY 10001</div>
-                    <div className="text-[11px] text-[#cbd5e1]">Phone: +1-234-567-8900</div>
-                    <div className="text-[11px] text-[#cbd5e1]">Email: contact@factory.com</div>
+                <div className="border border-[#334155]">
+                  <div className="flex items-start justify-between bg-[#111827] px-4 py-6 text-white">
+                    <div>
+                    <div className="text-[18px] font-semibold uppercase tracking-[0.04em] text-[#f7a614]">{companyInfo.companyName || defaultCompanyInfo.companyName}</div>
+                    {companyInfo.address ? <div className="mt-2 text-[11px] text-[#cbd5e1]">{companyInfo.address}</div> : null}
+                    {companyInfo.phone ? <div className="text-[11px] text-[#cbd5e1]">Phone: {companyInfo.phone}</div> : null}
+                    {companyInfo.email ? <div className="text-[11px] text-[#cbd5e1]">Email: {companyInfo.email}</div> : null}
                   </div>
                   <div className="text-right">
                     <div className="text-[18px] font-semibold uppercase tracking-[0.04em] text-[#f7a614]">Invoice</div>

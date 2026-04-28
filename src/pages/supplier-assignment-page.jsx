@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { getProjectGoodsSuppliers } from "@/shared/lib/project-goods-supplier-api";
 import { getProjects } from "@/shared/lib/project-api";
 import { createSupplierAssignment, getSupplierAssignments, updateSupplierAssignmentStatus } from "@/shared/lib/supplier-assignment-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function PlusIcon() {
   return (
@@ -30,6 +32,8 @@ export function SupplierAssignmentPage() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [updatingAssignmentId, setUpdatingAssignmentId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [formValues, setFormValues] = useState({
     project: "",
     material: "",
@@ -71,6 +75,41 @@ export function SupplierAssignmentPage() {
       isMounted = false;
     };
   }, []);
+  const paginatedAssignments = getPaginatedRows(assignments, currentPage, pageSize);
+
+  function handleExport() {
+    downloadCsvFile(
+      "supplier-assignment.csv",
+      ["ID", "Project", "Product", "Supplier", "Quantity", "Per Unit Price", "Total Cost", "Status"],
+      assignments.map((assignment) => [
+        assignment.id,
+        assignment.project,
+        assignment.product,
+        assignment.supplier,
+        assignment.quantity,
+        assignment.perUnitPrice,
+        assignment.totalCost,
+        assignment.status,
+      ]),
+    );
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Supplier Assignment",
+      columns: ["ID", "Project", "Product", "Supplier", "Quantity", "Per Unit Price", "Total Cost", "Status"],
+      rows: assignments.map((assignment) => [
+        assignment.id,
+        assignment.project,
+        assignment.product,
+        assignment.supplier,
+        assignment.quantity,
+        assignment.perUnitPrice,
+        assignment.totalCost,
+        assignment.status,
+      ]),
+    });
+  }
 
   function openAssignModal() {
     setErrorMessage("");
@@ -112,6 +151,7 @@ export function SupplierAssignmentPage() {
 
     createSupplierAssignment({
       projectId: formValues.project,
+      supplierId: formValues.supplier,
       product: formValues.material,
       supplier: selectedSupplier?.name || "",
       quantity: formValues.quantity,
@@ -156,6 +196,22 @@ export function SupplierAssignmentPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#f6a313] px-5 text-[14px] font-medium text-white transition hover:bg-[#f6a313]/10"
+            onClick={handleExport}
+            type="button"
+          >
+            <PlusIcon />
+            Export
+          </button>
+          <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <PlusIcon />
+            Download PDF
+          </button>
           <button
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
             onClick={openAssignModal}
@@ -208,7 +264,7 @@ export function SupplierAssignmentPage() {
                   </td>
                 </tr>
               ) : (
-                assignments.map((assignment) => (
+                paginatedAssignments.rows.map((assignment) => (
                   <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={assignment.id}>
                     <td className="truncate py-4 pr-3 font-semibold text-[#f7a614]">{assignment.id}</td>
                     <td className="truncate py-4 pr-3">{assignment.project}</td>
@@ -237,6 +293,20 @@ export function SupplierAssignmentPage() {
             </tbody>
           </table>
         </div>
+
+        {!pageLoading && assignments.length > 0 ? (
+          <TablePagination
+            currentPage={paginatedAssignments.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedAssignments.pageSize}
+            totalItems={paginatedAssignments.totalItems}
+            totalPages={paginatedAssignments.totalPages}
+          />
+        ) : null}
       </article>
 
       {isAssignModalOpen ? (

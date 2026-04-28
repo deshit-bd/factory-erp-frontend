@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { createBuyer, deleteBuyer, getBuyers, updateBuyer, updateBuyerStatus } from "@/shared/lib/buyer-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function SearchIcon() {
   return (
@@ -85,6 +87,8 @@ export function BuyerManagementPage() {
   const [buyers, setBuyers] = useState([]);
   const [countryOptions, setCountryOptions] = useState(fallbackCountryOptions);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -148,6 +152,7 @@ export function BuyerManagementPage() {
       buyer.status.toLowerCase().includes(query)
     );
   });
+  const paginatedBuyers = getPaginatedRows(filteredBuyers, currentPage, pageSize);
 
   function openAddBuyerModal() {
     setEditingBuyerId(null);
@@ -205,14 +210,15 @@ export function BuyerManagementPage() {
   function handleExport() {
     const header = ["ID", "Name", "Company", "Email", "Phone", "Country", "Status"];
     const rows = buyers.map((buyer) => [buyer.id, buyer.name, buyer.company, buyer.email, buyer.phone, buyer.country, buyer.status]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "buyers.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile("buyers.csv", header, rows);
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Buyer Management",
+      columns: ["ID", "Name", "Company", "Email", "Phone", "Country", "Status"],
+      rows: filteredBuyers.map((buyer) => [buyer.id, buyer.name, buyer.company, buyer.email, buyer.phone, buyer.country, buyer.status]),
+    });
   }
 
   async function handleDeleteBuyer(recordId) {
@@ -253,6 +259,14 @@ export function BuyerManagementPage() {
           >
             <DownloadIcon />
             Export
+          </button>
+          <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
           </button>
           <button
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
@@ -307,7 +321,7 @@ export function BuyerManagementPage() {
                   </td>
                 </tr>
               ) : (
-                filteredBuyers.map((buyer) => (
+                paginatedBuyers.rows.map((buyer) => (
                   <tr className="border-b border-[#2d394d] text-[14px] text-[#d7deea]" key={buyer.recordId}>
                     <td className="py-4 font-semibold text-[#f7a614]">{buyer.id}</td>
                     <td className="py-4 pr-3">{buyer.name}</td>
@@ -351,6 +365,20 @@ export function BuyerManagementPage() {
             </tbody>
           </table>
         </div>
+
+        {!isLoading && filteredBuyers.length > 0 ? (
+          <TablePagination
+            currentPage={paginatedBuyers.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedBuyers.pageSize}
+            totalItems={paginatedBuyers.totalItems}
+            totalPages={paginatedBuyers.totalPages}
+          />
+        ) : null}
       </article>
 
       {isAddBuyerModalOpen ? (

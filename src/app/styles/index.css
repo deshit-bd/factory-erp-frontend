@@ -21,6 +21,7 @@
     background: linear-gradient(180deg, #131d2e 0%, #111a29 100%);
     color: var(--color-ink-950);
     font-family: Inter, "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    overflow-x: hidden;
   }
 
   a {
@@ -48,6 +49,12 @@
     --app-text-muted: #8f9cb0;
     --app-text-soft: #7f8ea6;
     --app-overlay: rgba(13, 20, 34, 0.72);
+    --app-primary: #f5a30f;
+    --app-primary-hover: #ffb327;
+    --app-success: #22c55e;
+    --app-warning: #f59e0b;
+    --app-danger: #ef4444;
+    --app-info: #93a3b8;
   }
 
   :root[data-theme="light"] {
@@ -69,6 +76,10 @@
     --app-secondary-soft: #ecfdf5;
     --app-accent-soft: #eff6ff;
     --app-radius: 12px;
+    --app-success: #16a34a;
+    --app-warning: #d97706;
+    --app-danger: #dc2626;
+    --app-info: #64748b;
   }
 
   body {

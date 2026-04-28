@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { getProjects } from "@/shared/lib/project-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function SearchIcon() {
   return (
@@ -83,6 +85,8 @@ export function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("23-04-2024");
   const [dateTo, setDateTo] = useState("23-04-2024");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedProject, setSelectedProject] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
@@ -126,27 +130,40 @@ export function ProjectsPage() {
       project.status.toLowerCase().includes(query)
     );
   });
+  const paginatedProjects = getPaginatedRows(filteredProjects, currentPage, pageSize);
 
   function handleExport() {
-    const header = ["Project ID", "Product", "Quantity", "Buyer", "Start Date", "Delivery Date", "Status", "Progress"];
-    const rows = projects.map((project) => [
-      project.id,
-      project.product,
-      project.totalOrderQuantity,
-      project.buyer,
-      formatProjectDate(project.startDate),
-      formatProjectDate(project.deliveryDate),
-      project.status,
-      `${project.progress}%`,
-    ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "projects.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile(
+      "projects.csv",
+      ["Project ID", "Product", "Quantity", "Buyer", "Start Date", "Delivery Date", "Status", "Progress"],
+      filteredProjects.map((project) => [
+        project.id,
+        project.product,
+        project.totalOrderQuantity,
+        project.buyer,
+        formatProjectDate(project.startDate),
+        formatProjectDate(project.deliveryDate),
+        project.status,
+        `${project.progress}%`,
+      ]),
+    );
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Projects",
+      columns: ["Project ID", "Product", "Quantity", "Buyer", "Start Date", "Delivery Date", "Status", "Progress"],
+      rows: filteredProjects.map((project) => [
+        project.id,
+        project.product,
+        project.totalOrderQuantity,
+        project.buyer,
+        formatProjectDate(project.startDate),
+        formatProjectDate(project.deliveryDate),
+        project.status,
+        `${project.progress}%`,
+      ]),
+    });
   }
 
   return (
@@ -185,6 +202,14 @@ export function ProjectsPage() {
           >
             <DownloadIcon />
             Export
+          </button>
+          <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
           </button>
         </div>
       </div>
@@ -237,7 +262,7 @@ export function ProjectsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredProjects.map((project) => {
+                  paginatedProjects.rows.map((project) => {
                     const progress = getProgressValue(project.progress);
 
                     return (
@@ -281,6 +306,20 @@ export function ProjectsPage() {
               </tbody>
             </table>
           </div>
+
+          {!projectsLoading ? (
+            <TablePagination
+              currentPage={paginatedProjects.currentPage}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(value) => {
+                setPageSize(value);
+                setCurrentPage(1);
+              }}
+              pageSize={paginatedProjects.pageSize}
+              totalItems={paginatedProjects.totalItems}
+              totalPages={paginatedProjects.totalPages}
+            />
+          ) : null}
         </article>
 
         {isDetailsOpen && selectedProject ? (

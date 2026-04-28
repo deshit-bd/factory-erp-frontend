@@ -9,6 +9,8 @@ import {
   getUploadUrl,
   updateSupplierProductsTracking,
 } from "@/shared/lib/supplier-products-tracking-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function DownloadIcon() {
   return (
@@ -150,6 +152,8 @@ export function SupplierProductsTrackingPage() {
   const [editingRecordId, setEditingRecordId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formValues, setFormValues] = useState(emptyFormValues);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     let isMounted = true;
@@ -233,27 +237,40 @@ export function SupplierProductsTrackingPage() {
   const isQuantityUnavailable = Boolean(selectedProject) && totalOrderQuantity <= 0;
   const isSupplierQuantityUnavailable = Boolean(selectedProject && selectedSupplier) && assignedSupplierQuantity <= 0;
   const isQuantityOverLimit = Boolean(selectedProject && selectedSupplier) && enteredQuantity > remainingBeforeEntry;
+  const paginatedEntries = getPaginatedRows(entries, currentPage, pageSize);
 
   function handleExport() {
-    const header = ["ID", "Date", "Supplier", "Project ID", "Product", "Quantity Supplied", "Quality Status", "Notes"];
-    const rows = entries.map((entry) => [
-      entry.id,
-      formatDate(entry.date),
-      entry.supplier,
-      entry.projectId,
-      entry.product,
-      entry.quantitySupplied,
-      entry.qualityStatus,
-      entry.notes,
-    ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "supplier-products-tracking.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile(
+      "supplier-products-tracking.csv",
+      ["ID", "Date", "Supplier", "Project ID", "Product", "Quantity Supplied", "Quality Status", "Notes"],
+      entries.map((entry) => [
+        entry.id,
+        formatDate(entry.date),
+        entry.supplier,
+        entry.projectId,
+        entry.product,
+        entry.quantitySupplied,
+        entry.qualityStatus,
+        entry.notes,
+      ]),
+    );
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Supplier Products Tracking",
+      columns: ["ID", "Date", "Supplier", "Project ID", "Product", "Quantity Supplied", "Quality Status", "Notes"],
+      rows: entries.map((entry) => [
+        entry.id,
+        formatDate(entry.date),
+        entry.supplier,
+        entry.projectId,
+        entry.product,
+        entry.quantitySupplied,
+        entry.qualityStatus,
+        entry.notes,
+      ]),
+    });
   }
 
   function openAddModal() {
@@ -413,6 +430,14 @@ export function SupplierProductsTrackingPage() {
             Export
           </button>
           <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
+          </button>
+          <button
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
             onClick={openAddModal}
             type="button"
@@ -455,7 +480,7 @@ export function SupplierProductsTrackingPage() {
                   </td>
                 </tr>
               ) : (
-                entries.map((entry) => (
+                paginatedEntries.rows.map((entry) => (
                   <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={entry.id}>
                     <td className="py-4 font-semibold text-[#f7a614]">{entry.id}</td>
                     <td className="py-4 text-[#98a5bb]">{formatDate(entry.date)}</td>
@@ -491,6 +516,20 @@ export function SupplierProductsTrackingPage() {
             </tbody>
           </table>
         </div>
+
+        {!pageLoading ? (
+          <TablePagination
+            currentPage={paginatedEntries.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedEntries.pageSize}
+            totalItems={paginatedEntries.totalItems}
+            totalPages={paginatedEntries.totalPages}
+          />
+        ) : null}
       </article>
 
       {isModalOpen ? (

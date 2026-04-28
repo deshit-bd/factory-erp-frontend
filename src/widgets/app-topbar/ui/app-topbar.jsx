@@ -68,7 +68,9 @@ export function AppTopbar({
   sidebarCollapsed = false,
   onOpenMobileSidebar,
   onToggleTheme,
+  onLogout,
   theme = "dark",
+  user = null,
 }) {
   const currentDate = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
@@ -149,10 +151,24 @@ export function AppTopbar({
 
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f6a623]/20 text-[13px] font-semibold text-[#f6a623]">
-                8
+                {String(user?.name || "U")
+                  .trim()
+                  .charAt(0)
+                  .toUpperCase()}
               </div>
-              <span className="text-[14px] text-white">Admin</span>
+              <div className="flex flex-col leading-none">
+                <span className="text-[13px] text-white">{user?.name || "User"}</span>
+                <span className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[#93a0b4]">{String(user?.role || "").replaceAll("_", " ")}</span>
+              </div>
             </div>
+
+            <button
+              className="inline-flex h-9 items-center rounded-md border border-[#344056] bg-[#202b3d] px-3 text-[12px] font-medium text-[#c5cfdd] transition hover:text-white"
+              onClick={onLogout}
+              type="button"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </div>

@@ -211,12 +211,12 @@ function ChevronLeftIcon({ collapsed }) {
   );
 }
 
-export function AppSidebar({ collapsed = false, onToggleCollapsed, mobileOpen = false, onCloseMobile, onNavigate }) {
+export function AppSidebar({ collapsed = false, onToggleCollapsed, mobileOpen = false, onCloseMobile, onNavigate, items = sidebarItems }) {
   function SidebarNav({ mobile = false, onNavigate: handleNavigate }) {
     return (
       <div className={["flex h-full flex-col overflow-y-auto py-3", collapsed && !mobile ? "px-1.5" : "px-3"].join(" ")}>
         <nav aria-label="Sidebar navigation" className="flex flex-col gap-[2px]">
-          {sidebarItems.map((item) => (
+          {items.map((item) => (
             <NavLink
               className={({ isActive }) =>
                 [
@@ -225,7 +225,7 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed, mobileOpen = 
                   isActive ? "bg-[#f5a30f] font-semibold text-[#172136]" : "text-white/88 hover:bg-white/6",
                 ].join(" ")
               }
-              end={item.path === "/"}
+              end={item.originalPath === "/"}
               key={item.label}
               onClick={() => handleNavigate?.()}
               title={item.label}

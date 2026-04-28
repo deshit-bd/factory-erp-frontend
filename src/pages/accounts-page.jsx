@@ -3,79 +3,9 @@ import { createFactoryCost, getFactoryCosts, getUploadUrl } from "../shared/lib/
 import { createOfficeBill, getOfficeBills } from "../shared/lib/office-bill-api";
 import { getProjects } from "../shared/lib/project-api";
 import { createShipmentCosts, getShipmentCosts } from "../shared/lib/shipment-cost-api";
+import { getAccountsDashboard } from "../shared/lib/accounts-api";
 
 const accountTabs = ["Dashboard", "Project Wise", "Factory Costs", "Shipment Costs", "Office Costs"];
-
-const summaryCards = [
-  { key: "receivables", label: "Total Receivables", value: "৳0", tone: "amber", icon: "receivables" },
-  { key: "payables", label: "Total Payables", value: "৳0", tone: "red", icon: "payables" },
-  { key: "cash", label: "Cash/Bank Balance", value: "৳27,000", tone: "amber", icon: "cash" },
-  { key: "profit", label: "Net Profit/Loss", value: "+৳27,000", tone: "amber", icon: "profit" },
-];
-
-const debitRows = [
-  { date: "2026-04-10", reference: "EXP-001", category: "Export Cost / PRJ-001", amount: "-4000.00" },
-  { date: "2026-04-16", reference: "PAY-001", category: "Supplier Payment / PRJ-003", amount: "-300.00" },
-  { date: "2026-04-16", reference: "OFC-001", category: "Office Cost / Travel", amount: "-300.00" },
-];
-
-const creditRows = [
-  { date: "2026-04-10", reference: "INV-001", buyerName: "ABC Corp / PRJ-001", amount: "80000.00" },
-  { date: "2026-04-16", reference: "INV-002", buyerName: "XYZ / PRJ-003", amount: "90000.00" },
-  { date: "2026-04-16", reference: "INV-003", buyerName: "ABC / PRJ - 004", amount: "7000.00" },
-];
-
-const projectWiseCostCards = [
-  { key: "material", label: "Material Cost", value: "৳0" },
-  { key: "suppliers", label: "Suppliers Cost", value: "৳0" },
-  { key: "total", label: "Total Cost", value: "৳27,000" },
-];
-
-const projectWiseCostRows = [
-  {
-    projectId: "PRJ-001",
-    name: "Industrial Valves Order",
-    buyerName: "ABC crop",
-    materialCost: "50000.00",
-    supplierCost: "30000.00",
-    exportCost: "20000.00",
-    totalCost: "400000",
-  },
-  {
-    projectId: "PRJ-002",
-    name: "Steel Pipes Manufacturing",
-    buyerName: "XYZ.comp",
-    materialCost: "70000.00",
-    supplierCost: "40000.00",
-    exportCost: "30000.00",
-    totalCost: "400000",
-  },
-];
-
-const projectWiseProfitCards = [
-  { key: "budget", label: "Total Budget", value: "৳0" },
-  { key: "cost", label: "Total Cost", value: "৳0" },
-  { key: "profit", label: "Total Profit", value: "৳27,000" },
-];
-
-const projectWiseProfitRows = [
-  {
-    projectId: "PRJ-001",
-    name: "Industrial Valves Order",
-    buyerName: "ABC crop",
-    totalBudget: "50000.00",
-    totalCost: "30000.00",
-    profits: "20000.00",
-  },
-  {
-    projectId: "PRJ-002",
-    name: "Steel Pipes Manufacturing",
-    buyerName: "XYZ.comp",
-    totalBudget: "70000.00",
-    totalCost: "40000.00",
-    profits: "30000.00",
-  },
-];
 
 function getTodayDateValue() {
   const today = new Date();
@@ -242,11 +172,75 @@ function SearchIcon() {
   );
 }
 
+function formatCurrency(value) {
+  const amount = Number(value || 0);
+
+  return `৳${amount.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 function DashboardPanel() {
   const [activeLedger, setActiveLedger] = useState("Debit");
+  const [dashboard, setDashboard] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [search, setSearch] = useState("");
   const showingDebit = activeLedger === "Debit";
-  const rows = showingDebit ? debitRows : creditRows;
+  const rows = showingDebit ? dashboard?.debitRows || [] : dashboard?.creditRows || [];
   const searchPlaceholder = showingDebit ? "Search Debit transactions..." : "Search Credit transactions...";
+  const summaryCards = [
+    { key: "receivables", label: "Total Receivables", value: dashboard?.summary.receivablesFormatted || "৳0", tone: "amber", icon: "receivables" },
+    { key: "payables", label: "Total Payables", value: dashboard?.summary.payablesFormatted || "৳0", tone: "red", icon: "payables" },
+    { key: "cash", label: "Cash/Bank Balance", value: dashboard?.summary.cashBankBalanceFormatted || "৳0", tone: "amber", icon: "cash" },
+    { key: "profit", label: "Net Profit/Loss", value: dashboard?.summary.netProfitLossFormatted || "৳0", tone: "amber", icon: "profit" },
+  ];
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDashboard() {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await getAccountsDashboard();
+
+        if (isMounted) {
+          setDashboard(data);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message || "Failed to load accounts dashboard.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadDashboard();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredRows = rows.filter((row) => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return true;
+    }
+
+    return (
+      row.date.toLowerCase().includes(query) ||
+      row.reference.toLowerCase().includes(query) ||
+      row.description.toLowerCase().includes(query) ||
+      row.amount.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <div className="space-y-5">
@@ -269,6 +263,8 @@ function DashboardPanel() {
         ))}
       </section>
 
+      {errorMessage ? <div className="rounded-[5px] border border-[#7f1d1d] bg-[#3a1d1d] px-4 py-3 text-[12px] text-[#fecaca]">{errorMessage}</div> : null}
+
       <section className="flex flex-wrap gap-2">
         {["Debit", "Credit"].map((item) => (
           <button
@@ -290,7 +286,13 @@ function DashboardPanel() {
       <section className="rounded-[5px] border border-[#344059] bg-[#202b3f] px-4 py-4">
         <div className="flex items-center gap-3 rounded-[4px] border border-[#344059] bg-[#202b3f] px-3 py-3 text-[#8b96ab]">
           <SearchIcon />
-          <span className="text-[12px]">{searchPlaceholder}</span>
+          <input
+            className="w-full bg-transparent text-[12px] text-[#d7deea] outline-none placeholder:text-[#8b96ab]"
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={searchPlaceholder}
+            type="text"
+            value={search}
+          />
         </div>
 
         <div className="mt-4 overflow-x-auto">
@@ -299,16 +301,28 @@ function DashboardPanel() {
               <tr className="border-b border-[#344059] text-[10px] uppercase tracking-[0.14em] text-[#98a3b8]">
                 <th className="pb-3 font-medium">Date</th>
                 <th className="pb-3 font-medium">Reference</th>
-                <th className="pb-3 font-medium">{showingDebit ? "Category" : "Buyer Name"}</th>
+                <th className="pb-3 font-medium">Description</th>
                 <th className="pb-3 text-right font-medium">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]" key={row.reference}>
+              {isLoading ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={4}>
+                    Loading ledger transactions...
+                  </td>
+                </tr>
+              ) : filteredRows.length === 0 ? (
+                <tr>
+                  <td className="py-8 text-center text-[14px] text-[#93a0b4]" colSpan={4}>
+                    No ledger transactions found.
+                  </td>
+                </tr>
+              ) : filteredRows.map((row) => (
+                <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]" key={`${row.date}-${row.reference}-${row.ledger}-${row.description}`}>
                   <td className="py-4 text-[#9aa5ba]">{row.date}</td>
                   <td className="py-4 font-semibold text-[#f5a30f]">{row.reference}</td>
-                  <td className="py-4">{showingDebit ? row.category : row.buyerName}</td>
+                  <td className="py-4">{row.description}</td>
                   <td
                     className={[
                       "py-4 text-right font-semibold",
@@ -330,8 +344,54 @@ function DashboardPanel() {
 function ProjectWisePanel() {
   const [activeProjectTab, setActiveProjectTab] = useState("Project Wise cost");
   const [costSearch, setCostSearch] = useState("");
+  const [projectWiseData, setProjectWiseData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const projectWiseRows = projectWiseData?.rows || [];
+  const projectWiseSummary = projectWiseData?.summary;
+  const projectWiseCostCards = [
+    { key: "material", label: "Material Cost", value: projectWiseSummary?.materialCostFormatted || "৳0" },
+    { key: "suppliers", label: "Suppliers Cost", value: projectWiseSummary?.supplierCostFormatted || "৳0" },
+    { key: "shipment", label: "Shipment Cost", value: projectWiseSummary?.shipmentCostFormatted || "৳0" },
+    { key: "total", label: "Total Cost", value: projectWiseSummary?.totalCostFormatted || "৳0" },
+  ];
+  const projectWiseProfitCards = [
+    { key: "budget", label: "Total Budget", value: projectWiseSummary?.totalBudgetFormatted || "৳0" },
+    { key: "cost", label: "Total Cost", value: projectWiseSummary?.totalCostFormatted || "৳0" },
+    { key: "profit", label: "Total Profit", value: projectWiseSummary?.totalProfitFormatted || "৳0" },
+  ];
 
-  const filteredProjectWiseCostRows = projectWiseCostRows.filter((row) => {
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProjectWiseData() {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        const data = await getAccountsDashboard();
+
+        if (isMounted) {
+          setProjectWiseData(data.projectWise || { rows: [], summary: null });
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error.message || "Failed to load project wise accounts.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadProjectWiseData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredProjectWiseRows = projectWiseRows.filter((row) => {
     const query = costSearch.toLowerCase().trim();
 
     if (!query) {
@@ -344,8 +404,10 @@ function ProjectWisePanel() {
       row.buyerName.toLowerCase().includes(query) ||
       row.materialCost.toLowerCase().includes(query) ||
       row.supplierCost.toLowerCase().includes(query) ||
-      row.exportCost.toLowerCase().includes(query) ||
-      row.totalCost.toLowerCase().includes(query)
+      row.shipmentCost.toLowerCase().includes(query) ||
+      row.totalCost.toLowerCase().includes(query) ||
+      row.totalBudget.toLowerCase().includes(query) ||
+      row.profits.toLowerCase().includes(query)
     );
   });
 
@@ -367,9 +429,12 @@ function ProjectWisePanel() {
         ))}
       </section>
 
+      {projectWiseData?.allocationMethod ? <p className="text-[12px] text-[#8f9cb0]">{projectWiseData.allocationMethod}</p> : null}
+      {errorMessage ? <div className="rounded-[5px] border border-[#5b3540] bg-[#37242a] px-4 py-3 text-[13px] text-[#f7c8cf]">{errorMessage}</div> : null}
+
       {activeProjectTab === "Project Wise cost" ? (
         <>
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {projectWiseCostCards.map((card) => (
               <article
                 className="rounded-[4px] border border-[#344059] bg-[#202b3f] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
@@ -406,22 +471,36 @@ function ProjectWisePanel() {
                     <th className="pb-3 font-medium">Buyer Name</th>
                     <th className="pb-3 font-medium">Material Cost</th>
                     <th className="pb-3 font-medium">Supplier Cost</th>
-                    <th className="pb-3 font-medium">Export Cost</th>
+                    <th className="pb-3 font-medium">Shipment Cost</th>
                     <th className="pb-3 text-right font-medium">Total Cost</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProjectWiseCostRows.map((row) => (
+                  {isLoading ? (
+                    <tr>
+                      <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={7}>
+                        Loading project wise costs...
+                      </td>
+                    </tr>
+                  ) : filteredProjectWiseRows.length > 0 ? (
+                    filteredProjectWiseRows.map((row) => (
                     <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]" key={row.projectId}>
                       <td className="py-4 font-semibold text-[#f5a30f]">{row.projectId}</td>
                       <td className="py-4">{row.name}</td>
                       <td className="py-4">{row.buyerName}</td>
                       <td className="py-4 font-semibold text-[#f1f5f9]">{row.materialCost}</td>
                       <td className="py-4 font-mono text-[#e5e7eb]">{row.supplierCost}</td>
-                      <td className="py-4 font-mono text-[#e5e7eb]">{row.exportCost}</td>
+                      <td className="py-4 font-mono text-[#e5e7eb]">{row.shipmentCost}</td>
                       <td className="py-4 text-right font-semibold text-[#f5a30f]">{row.totalCost}</td>
                     </tr>
-                  ))}
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={7}>
+                        No project wise cost data found.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -446,12 +525,18 @@ function ProjectWisePanel() {
           </section>
 
           <section className="rounded-[5px] border border-[#344059] bg-[#202b3f] px-4 py-4">
-            <div className="text-[13px] font-semibold text-[#d7deea]">Project Wise Cost</div>
+            <div className="text-[13px] font-semibold text-[#d7deea]">Project Wise Profit</div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-[4px] border border-[#344059] bg-[#202b3f] px-3 py-3 text-[#8b96ab]">
+            <label className="mt-4 flex items-center gap-3 rounded-[4px] border border-[#344059] bg-[#202b3f] px-3 py-3 text-[#8b96ab]">
               <SearchIcon />
-              <span className="text-[12px]">Search...</span>
-            </div>
+              <input
+                className="w-full bg-transparent text-[12px] text-[#d7deea] outline-none placeholder:text-[#8b96ab]"
+                onChange={(event) => setCostSearch(event.target.value)}
+                placeholder="Search..."
+                type="text"
+                value={costSearch}
+              />
+            </label>
 
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[900px] table-fixed border-collapse text-left">
@@ -466,16 +551,32 @@ function ProjectWisePanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {projectWiseProfitRows.map((row) => (
+                  {isLoading ? (
+                    <tr>
+                      <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={6}>
+                        Loading project wise profit...
+                      </td>
+                    </tr>
+                  ) : filteredProjectWiseRows.length > 0 ? (
+                    filteredProjectWiseRows.map((row) => (
                     <tr className="border-b border-[#344059] text-[13px] text-[#d7deea]" key={row.projectId}>
                       <td className="py-4 font-semibold text-[#f5a30f]">{row.projectId}</td>
                       <td className="py-4">{row.name}</td>
                       <td className="py-4">{row.buyerName}</td>
                       <td className="py-4 font-semibold text-[#f1f5f9]">{row.totalBudget}</td>
                       <td className="py-4 font-mono text-[#e5e7eb]">{row.totalCost}</td>
-                      <td className="py-4 font-semibold text-[#f1f5f9]">{row.profits}</td>
+                      <td className={["py-4 font-semibold", Number(row.profitsValue || 0) < 0 ? "text-[#ff5555]" : "text-[#22c55e]"].join(" ")}>
+                        {Number(row.profitsValue || 0) < 0 ? `-${formatCurrency(Math.abs(Number(row.profitsValue || 0)))}` : row.profits}
+                      </td>
                     </tr>
-                  ))}
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="py-8 text-center text-[14px] text-[#98a5bb]" colSpan={6}>
+                        No project wise profit data found.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

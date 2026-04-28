@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { getProjects } from "@/shared/lib/project-api";
 import { createRawMaterialAllocation, getRawMaterialAllocations } from "@/shared/lib/raw-material-allocation-api";
 import { getRawMaterialStocks } from "@/shared/lib/raw-material-stock-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function PlusIcon() {
   return (
@@ -38,6 +40,8 @@ export function MaterialAllocationPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [formValues, setFormValues] = useState({
     projectId: "",
     rawMaterialId: "",
@@ -113,6 +117,24 @@ export function MaterialAllocationPage() {
     };
   }, []);
 
+  const paginatedAllocations = getPaginatedRows(allocations, currentPage, pageSize);
+
+  function handleExport() {
+    downloadCsvFile(
+      "material-allocation.csv",
+      ["Allocation ID", "Project", "Project Name", "Material", "Quantity", "Date"],
+      allocations.map((allocation) => [allocation.id, allocation.project, allocation.projectName, allocation.material, allocation.quantity, allocation.date]),
+    );
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Material Allocation",
+      columns: ["Allocation ID", "Project", "Project Name", "Material", "Quantity", "Date"],
+      rows: allocations.map((allocation) => [allocation.id, allocation.project, allocation.projectName, allocation.material, allocation.quantity, allocation.date]),
+    });
+  }
+
   function openAllocateModal() {
     setErrorMessage("");
     setIsAllocateModalOpen(true);
@@ -167,6 +189,22 @@ export function MaterialAllocationPage() {
 
         <div className="flex flex-wrap gap-3">
           <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#f6a313] px-5 text-[14px] font-medium text-white transition hover:bg-[#f6a313]/10"
+            onClick={handleExport}
+            type="button"
+          >
+            <PlusIcon />
+            Export
+          </button>
+          <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <PlusIcon />
+            Download PDF
+          </button>
+          <button
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
             onClick={openAllocateModal}
             type="button"
@@ -201,7 +239,7 @@ export function MaterialAllocationPage() {
                   </td>
                 </tr>
               ) : allocations.length > 0 ? (
-                allocations.map((allocation) => (
+                paginatedAllocations.rows.map((allocation) => (
                   <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={allocation.recordId}>
                     <td className="py-4 font-semibold text-[#f7a614]">{allocation.id}</td>
                     <td className="py-4">
@@ -223,6 +261,20 @@ export function MaterialAllocationPage() {
             </tbody>
           </table>
         </div>
+
+        {!allocationsLoading && allocations.length > 0 ? (
+          <TablePagination
+            currentPage={paginatedAllocations.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedAllocations.pageSize}
+            totalItems={paginatedAllocations.totalItems}
+            totalPages={paginatedAllocations.totalPages}
+          />
+        ) : null}
       </article>
 
       {isAllocateModalOpen ? (

@@ -8,6 +8,8 @@ import {
 import { getProjects } from "@/shared/lib/project-api";
 import { getRawMaterialAllocations } from "@/shared/lib/raw-material-allocation-api";
 import { getSupplierAssignments } from "@/shared/lib/supplier-assignment-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function DownloadIcon() {
   return (
@@ -65,6 +67,8 @@ function toQuantity(value) {
 export function FactoryProductTrackingPage() {
   const [entries, setEntries] = useState([]);
   const [entriesLoading, setEntriesLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [projectOptions, setProjectOptions] = useState([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [supplierAssignments, setSupplierAssignments] = useState([]);
@@ -155,26 +159,22 @@ export function FactoryProductTrackingPage() {
   const hasProductionLimit = Boolean(selectedProject) && totalOrderQuantity > 0;
   const isQuantityUnavailable = Boolean(selectedProject) && totalOrderQuantity <= 0;
   const isQuantityOverLimit = hasProductionLimit && enteredQuantity > remainingBeforeEntry;
+  const paginatedEntries = getPaginatedRows(entries, currentPage, pageSize);
 
   function handleExport() {
-    const header = ["ID", "Date", "Project ID", "Product Name", "Quantity Produced", "Quality Status", "Remarks"];
-    const rows = entries.map((entry) => [
-      entry.id,
-      entry.date,
-      entry.projectId,
-      entry.productName,
-      entry.quantityProduced,
-      entry.qualityStatus,
-      entry.remarks,
-    ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "factory-product-tracking.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile(
+      "factory-product-tracking.csv",
+      ["ID", "Date", "Project ID", "Product Name", "Quantity Produced", "Quality Status", "Remarks"],
+      entries.map((entry) => [entry.id, entry.date, entry.projectId, entry.productName, entry.quantityProduced, entry.qualityStatus, entry.remarks]),
+    );
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Factory Product Tracking",
+      columns: ["ID", "Date", "Project ID", "Product Name", "Quantity Produced", "Quality Status", "Remarks"],
+      rows: entries.map((entry) => [entry.id, entry.date, entry.projectId, entry.productName, entry.quantityProduced, entry.qualityStatus, entry.remarks]),
+    });
   }
 
   function openAddModal() {
@@ -294,6 +294,14 @@ export function FactoryProductTrackingPage() {
             Export
           </button>
           <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
+          </button>
+          <button
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
             onClick={openAddModal}
             type="button"
@@ -331,7 +339,7 @@ export function FactoryProductTrackingPage() {
                   </td>
                 </tr>
               ) : entries.length > 0 ? (
-                entries.map((entry) => (
+                paginatedEntries.rows.map((entry) => (
                   <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={entry.recordId}>
                     <td className="py-4 font-semibold text-[#f7a614]">{entry.id}</td>
                     <td className="py-4 text-[#98a5bb]">{entry.date}</td>
@@ -363,6 +371,20 @@ export function FactoryProductTrackingPage() {
             </tbody>
           </table>
         </div>
+
+        {!entriesLoading ? (
+          <TablePagination
+            currentPage={paginatedEntries.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedEntries.pageSize}
+            totalItems={paginatedEntries.totalItems}
+            totalPages={paginatedEntries.totalPages}
+          />
+        ) : null}
       </article>
 
       {isModalOpen ? (

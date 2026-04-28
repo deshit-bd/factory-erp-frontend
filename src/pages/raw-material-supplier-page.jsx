@@ -6,6 +6,10 @@ import {
   getRawMaterialSuppliers,
   updateRawMaterialSupplier,
 } from "@/shared/lib/raw-material-supplier-api";
+import { getRawMaterialPurchases } from "@/shared/lib/raw-material-purchase-api";
+import { getRawMaterialSupplierPayments } from "@/shared/lib/raw-material-supplier-payment-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function SearchIcon() {
   return (
@@ -57,6 +61,21 @@ function EditIcon() {
         strokeLinejoin="round"
         strokeWidth="1.8"
       />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+      <path
+        d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
     </svg>
   );
 }
@@ -125,7 +144,15 @@ export function RawMaterialSupplierPage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
+  const [previewSupplier, setPreviewSupplier] = useState(null);
+  const [previewActiveTab, setPreviewActiveTab] = useState("due");
+  const [previewSupplierDueRows, setPreviewSupplierDueRows] = useState([]);
+  const [previewSupplierDueLoading, setPreviewSupplierDueLoading] = useState(false);
+  const [previewSupplierPaymentRows, setPreviewSupplierPaymentRows] = useState([]);
+  const [previewSupplierPaymentLoading, setPreviewSupplierPaymentLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formValues, setFormValues] = useState({
     name: "",
@@ -173,25 +200,22 @@ export function RawMaterialSupplierPage() {
 
     return matchesSearch && isWithinDateRange(supplier.createdAt, dateFrom, dateTo);
   });
+  const paginatedSuppliers = getPaginatedRows(filteredSuppliers, currentPage, pageSize);
 
   function handleExport() {
-    const header = ["ID", "Name", "Category", "Email", "Phone", "Rating"];
-    const rows = filteredSuppliers.map((supplier) => [
-      supplier.id,
-      supplier.name,
-      supplier.category,
-      supplier.email,
-      supplier.phone,
-      supplier.rating,
-    ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "raw-material-suppliers.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile(
+      "raw-material-suppliers.csv",
+      ["ID", "Name", "Category", "Email", "Phone", "Rating"],
+      filteredSuppliers.map((supplier) => [supplier.id, supplier.name, supplier.category, supplier.email, supplier.phone, supplier.rating]),
+    );
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Raw Material Supplier",
+      columns: ["ID", "Name", "Category", "Email", "Phone", "Rating"],
+      rows: filteredSuppliers.map((supplier) => [supplier.id, supplier.name, supplier.category, supplier.email, supplier.phone, supplier.rating]),
+    });
   }
 
   function openAddSupplierModal() {
@@ -227,6 +251,59 @@ export function RawMaterialSupplierPage() {
       email: "",
       phone: "",
     });
+  }
+
+  async function openViewSupplierModal(supplier) {
+    setPreviewSupplier(supplier);
+    setPreviewActiveTab("due");
+    setPreviewSupplierDueLoading(true);
+    setPreviewSupplierDueRows([]);
+    setPreviewSupplierPaymentLoading(true);
+    setPreviewSupplierPaymentRows([]);
+
+    try {
+      const [purchases, payments] = await Promise.all([getRawMaterialPurchases(), getRawMaterialSupplierPayments()]);
+      const supplierPurchases = purchases.filter(
+        (purchase) => purchase.supplierId === supplier.id || purchase.supplierRecordId === supplier.recordId || purchase.supplier === supplier.name,
+      );
+
+      const groupedRows = Array.from(
+        supplierPurchases.reduce((map, purchase) => {
+          const current = map.get(purchase.material) || {
+            material: purchase.material,
+            quantity: 0,
+            totalDue: 0,
+          };
+
+          current.quantity += Number(purchase.quantity || 0);
+          current.totalDue += Number(String(purchase.total || "0").replace(/[^\d.-]/g, ""));
+          map.set(purchase.material, current);
+          return map;
+        }, new Map()).values(),
+      );
+
+      setPreviewSupplierDueRows(groupedRows);
+
+      const supplierPayments = payments.filter(
+        (payment) => payment.supplierId === supplier.id || payment.supplierRecordId === supplier.recordId || payment.supplier === supplier.name,
+      );
+      setPreviewSupplierPaymentRows(supplierPayments);
+    } catch {
+      setPreviewSupplierDueRows([]);
+      setPreviewSupplierPaymentRows([]);
+    } finally {
+      setPreviewSupplierDueLoading(false);
+      setPreviewSupplierPaymentLoading(false);
+    }
+  }
+
+  function closeViewSupplierModal() {
+    setPreviewSupplier(null);
+    setPreviewActiveTab("due");
+    setPreviewSupplierDueRows([]);
+    setPreviewSupplierDueLoading(false);
+    setPreviewSupplierPaymentRows([]);
+    setPreviewSupplierPaymentLoading(false);
   }
 
   function handleFormChange(event) {
@@ -287,6 +364,14 @@ export function RawMaterialSupplierPage() {
             Export
           </button>
           <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
+          </button>
+          <button
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
             onClick={openAddSupplierModal}
             type="button"
@@ -335,15 +420,24 @@ export function RawMaterialSupplierPage() {
 
         <div className="mt-4 overflow-x-hidden">
           <table className="w-full table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-[8%]" />
+              <col className="w-[20%]" />
+              <col className="w-[15%]" />
+              <col className="w-[22%]" />
+              <col className="w-[16%]" />
+              <col className="w-[9%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
-                <th className="w-[68px] pb-3 font-medium">ID</th>
-                <th className="w-[19%] pb-3 font-medium">Name</th>
-                <th className="w-[14%] pb-3 font-medium">Category</th>
-                <th className="w-[19%] pb-3 font-medium">Email</th>
-                <th className="w-[13%] pb-3 font-medium">Phone</th>
-                <th className="w-[7%] pb-3 font-medium">Rating</th>
-                <th className="w-[11%] pb-3 text-right font-medium">Actions</th>
+                <th className="pb-3 font-medium">ID</th>
+                <th className="pb-3 font-medium">Name</th>
+                <th className="pb-3 font-medium">Category</th>
+                <th className="pb-3 font-medium">Email</th>
+                <th className="pb-3 font-medium">Phone</th>
+                <th className="pb-3 font-medium">Rating</th>
+                <th className="pb-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -360,13 +454,13 @@ export function RawMaterialSupplierPage() {
                   </td>
                 </tr>
               ) : (
-                filteredSuppliers.map((supplier) => (
+                paginatedSuppliers.rows.map((supplier) => (
                   <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={supplier.recordId}>
-                    <td className="py-4 font-semibold text-[#f7a614]">{supplier.id}</td>
-                    <td className="py-4 pr-3">{supplier.name}</td>
-                    <td className="py-4 pr-3">{supplier.category}</td>
-                    <td className="py-4 pr-3 text-[#98a5bb]">{supplier.email}</td>
-                    <td className="py-4 pr-3">{supplier.phone}</td>
+                    <td className="truncate py-4 pr-3 font-semibold text-[#f7a614]">{supplier.id}</td>
+                    <td className="truncate py-4 pr-3">{supplier.name}</td>
+                    <td className="truncate py-4 pr-3">{supplier.category}</td>
+                    <td className="truncate py-4 pr-3 text-[#98a5bb]">{supplier.email}</td>
+                    <td className="truncate py-4 pr-3">{supplier.phone}</td>
                     <td className="py-4">
                       <span className="inline-flex items-center gap-1 text-[#f7a614]">
                         <StarIcon />
@@ -375,6 +469,9 @@ export function RawMaterialSupplierPage() {
                     </td>
                     <td className="py-4">
                       <div className="flex justify-end gap-4">
+                        <button className="text-[#93c5fd] transition hover:text-white" onClick={() => openViewSupplierModal(supplier)} type="button">
+                          <EyeIcon />
+                        </button>
                         <button className="text-[#d7deea] transition hover:text-white" onClick={() => openEditSupplierModal(supplier)} type="button">
                           <EditIcon />
                         </button>
@@ -393,6 +490,20 @@ export function RawMaterialSupplierPage() {
             </tbody>
           </table>
         </div>
+
+        {!suppliersLoading ? (
+          <TablePagination
+            currentPage={paginatedSuppliers.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedSuppliers.pageSize}
+            totalItems={paginatedSuppliers.totalItems}
+            totalPages={paginatedSuppliers.totalPages}
+          />
+        ) : null}
       </article>
 
       {isAddSupplierModalOpen ? (
@@ -466,6 +577,180 @@ export function RawMaterialSupplierPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {previewSupplier ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0d1422]/70 px-4 py-4">
+          <div className="w-full max-w-[520px] rounded-md border border-[#314058] bg-[#222d40] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between border-b border-[#314058] px-4 py-4">
+              <h3 className="text-[24px] font-semibold text-[#e6ebf4]">Supplier Details</h3>
+              <button className="text-[#d7deea] transition hover:text-white" onClick={closeViewSupplierModal} type="button">
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-2">
+              <div className="rounded-md border border-[#314058] bg-[#243045] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#7f8ea6]">Supplier ID</div>
+                <div className="mt-2 text-[15px] font-semibold text-[#f7a614]">{previewSupplier.id}</div>
+              </div>
+              <div className="rounded-md border border-[#314058] bg-[#243045] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#7f8ea6]">Rating</div>
+                <div className="mt-2 inline-flex items-center gap-1 text-[15px] text-[#f7a614]">
+                  <StarIcon />
+                  <span className="text-[#e6ebf4]">{previewSupplier.rating}</span>
+                </div>
+              </div>
+              <div className="rounded-md border border-[#314058] bg-[#243045] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#7f8ea6]">Name</div>
+                <div className="mt-2 text-[15px] text-[#e6ebf4]">{previewSupplier.name}</div>
+              </div>
+              <div className="rounded-md border border-[#314058] bg-[#243045] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#7f8ea6]">Category</div>
+                <div className="mt-2 text-[15px] text-[#e6ebf4]">{previewSupplier.category}</div>
+              </div>
+              <div className="rounded-md border border-[#314058] bg-[#243045] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#7f8ea6]">Email</div>
+                <div className="mt-2 break-all text-[15px] text-[#98a5bb]">{previewSupplier.email || "N/A"}</div>
+              </div>
+              <div className="rounded-md border border-[#314058] bg-[#243045] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#7f8ea6]">Phone</div>
+                <div className="mt-2 text-[15px] text-[#e6ebf4]">{previewSupplier.phone || "N/A"}</div>
+              </div>
+              <div className="rounded-md border border-[#314058] bg-[#243045] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#7f8ea6]">Previous Due</div>
+                <div className="mt-2 text-[15px] text-[#e6ebf4]">৳{Number(previewSupplier.previousDue || 0).toLocaleString("en-US")}</div>
+              </div>
+              <div className="rounded-md border border-[#314058] bg-[#243045] px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#7f8ea6]">Created Date</div>
+                <div className="mt-2 text-[15px] text-[#e6ebf4]">{formatSupplierDate(previewSupplier.createdAt) || "N/A"}</div>
+              </div>
+            </div>
+
+            <div className="border-t border-[#314058] px-4 py-4">
+              <div className="flex flex-wrap items-center gap-2 border-b border-[#314058] pb-3">
+                <button
+                  className={[
+                    "rounded-md px-3 py-2 text-[13px] font-medium transition",
+                    previewActiveTab === "due" ? "bg-[#f6a313] text-[#111827]" : "bg-[#243045] text-[#d7deea] hover:text-white",
+                  ].join(" ")}
+                  onClick={() => setPreviewActiveTab("due")}
+                  type="button"
+                >
+                  Product-wise Due
+                </button>
+                <button
+                  className={[
+                    "rounded-md px-3 py-2 text-[13px] font-medium transition",
+                    previewActiveTab === "payments" ? "bg-[#f6a313] text-[#111827]" : "bg-[#243045] text-[#d7deea] hover:text-white",
+                  ].join(" ")}
+                  onClick={() => setPreviewActiveTab("payments")}
+                  type="button"
+                >
+                  Payment History
+                </button>
+              </div>
+
+              {previewActiveTab === "due" ? (
+                <div className="mt-3 overflow-hidden rounded-md border border-[#314058] bg-[#243045]">
+                  <table className="w-full table-fixed border-collapse text-left">
+                    <colgroup>
+                      <col className="w-[52%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[30%]" />
+                    </colgroup>
+                    <thead>
+                      <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
+                        <th className="px-4 py-3 font-medium">Product</th>
+                        <th className="px-4 py-3 font-medium">Qty</th>
+                        <th className="px-4 py-3 font-medium">Due</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewSupplierDueLoading ? (
+                        <tr>
+                          <td className="px-4 py-6 text-center text-[13px] text-[#93a0b4]" colSpan={3}>
+                            Loading product-wise due...
+                          </td>
+                        </tr>
+                      ) : previewSupplierDueRows.length === 0 ? (
+                        <tr>
+                          <td className="px-4 py-6 text-center text-[13px] text-[#93a0b4]" colSpan={3}>
+                            No product-wise due found.
+                          </td>
+                        </tr>
+                      ) : (
+                        previewSupplierDueRows.map((row) => (
+                          <tr className="border-b border-[#314058] text-[13px] text-[#d7deea] last:border-b-0" key={row.material}>
+                            <td className="truncate px-4 py-3">{row.material}</td>
+                            <td className="px-4 py-3">{row.quantity}</td>
+                            <td className="px-4 py-3 font-medium text-[#f7a614]">৳{row.totalDue.toLocaleString("en-US")}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="mt-3 overflow-hidden rounded-md border border-[#314058] bg-[#243045]">
+                  <table className="w-full table-fixed border-collapse text-left">
+                    <colgroup>
+                      <col className="w-[24%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[18%]" />
+                    </colgroup>
+                    <thead>
+                      <tr className="border-b border-[#314058] text-[10px] uppercase tracking-[0.16em] text-[#7f8ea6]">
+                        <th className="px-4 py-3 font-medium">Payment ID</th>
+                        <th className="px-4 py-3 font-medium">Date</th>
+                        <th className="px-4 py-3 font-medium">Paid</th>
+                        <th className="px-4 py-3 font-medium">Remaining</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewSupplierPaymentLoading ? (
+                        <tr>
+                          <td className="px-4 py-6 text-center text-[13px] text-[#93a0b4]" colSpan={5}>
+                            Loading payment history...
+                          </td>
+                        </tr>
+                      ) : previewSupplierPaymentRows.length === 0 ? (
+                        <tr>
+                          <td className="px-4 py-6 text-center text-[13px] text-[#93a0b4]" colSpan={5}>
+                            No payment history found.
+                          </td>
+                        </tr>
+                      ) : (
+                        previewSupplierPaymentRows.map((row) => (
+                          <tr className="border-b border-[#314058] text-[13px] text-[#d7deea] last:border-b-0" key={row.recordId}>
+                            <td className="truncate px-4 py-3 text-[#f7a614]">{row.id}</td>
+                            <td className="px-4 py-3">{row.date}</td>
+                            <td className="px-4 py-3">{row.totalPaid}</td>
+                            <td className="px-4 py-3">{row.remainingDue}</td>
+                            <td className="px-4 py-3">{row.status}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end border-t border-[#314058] px-4 py-4">
+              <button
+                className="inline-flex h-11 items-center rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
+                onClick={closeViewSupplierModal}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

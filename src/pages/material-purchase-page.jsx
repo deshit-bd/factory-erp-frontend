@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { createRawMaterialPurchase, getRawMaterialPurchases, getUploadUrl } from "@/shared/lib/raw-material-purchase-api";
 import { getRawMaterialStocks } from "@/shared/lib/raw-material-stock-api";
 import { getRawMaterialSuppliers } from "@/shared/lib/raw-material-supplier-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function SearchIcon() {
   return (
@@ -104,6 +106,8 @@ export function MaterialPurchasePage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isAddPurchaseModalOpen, setIsAddPurchaseModalOpen] = useState(false);
   const [isMaterialSuggestionsOpen, setIsMaterialSuggestionsOpen] = useState(false);
   const [receiptPreview, setReceiptPreview] = useState(null);
@@ -211,6 +215,7 @@ export function MaterialPurchasePage() {
 
     return matchesSearch && matchesDateFrom && matchesDateTo;
   });
+  const paginatedPurchases = getPaginatedRows(filteredPurchases, currentPage, pageSize);
 
   function handleExport() {
     const header = ["Purchase ID", "Material", "Supplier", "Rating", "Quantity", "Unit Cost", "Total", "Date"];
@@ -224,14 +229,24 @@ export function MaterialPurchasePage() {
       purchase.total,
       purchase.date,
     ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "material-purchase.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile("material-purchase.csv", header, rows);
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Material Purchase",
+      columns: ["Purchase ID", "Material", "Supplier", "Rating", "Quantity", "Unit Cost", "Total", "Date"],
+      rows: filteredPurchases.map((purchase) => [
+        purchase.id,
+        purchase.material,
+        purchase.supplier,
+        purchase.supplierRating,
+        purchase.quantity,
+        purchase.unitCost,
+        purchase.total,
+        purchase.date,
+      ]),
+    });
   }
 
   function openAddPurchaseModal() {
@@ -354,6 +369,14 @@ export function MaterialPurchasePage() {
             Export
           </button>
           <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
+          </button>
+          <button
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
             onClick={openAddPurchaseModal}
             type="button"
@@ -429,7 +452,7 @@ export function MaterialPurchasePage() {
                   </td>
                 </tr>
               ) : (
-                filteredPurchases.map((purchase) => (
+                paginatedPurchases.rows.map((purchase) => (
                   <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={purchase.recordId}>
                     <td className="truncate py-4 pr-3 font-semibold text-[#f7a614]">{purchase.id}</td>
                     <td className="truncate py-4 pr-3">{purchase.material}</td>
@@ -465,6 +488,20 @@ export function MaterialPurchasePage() {
             </tbody>
           </table>
         </div>
+
+        {!purchasesLoading && filteredPurchases.length > 0 ? (
+          <TablePagination
+            currentPage={paginatedPurchases.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedPurchases.pageSize}
+            totalItems={paginatedPurchases.totalItems}
+            totalPages={paginatedPurchases.totalPages}
+          />
+        ) : null}
       </article>
 
       {isAddPurchaseModalOpen ? (

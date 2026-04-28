@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 import { getBuyers } from "@/shared/lib/buyer-api";
 import { createSalesOrder, deleteSalesOrder, getSalesOrders, updateSalesOrderStatus } from "@/shared/lib/sales-order-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 const ORDER_STATUS_OPTIONS = ["Pending", "Confirmed", "In Progress", "Completed"];
 
@@ -142,6 +144,8 @@ export function SalesOrdersPage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isCreateOrderModalOpen, setIsCreateOrderModalOpen] = useState(false);
   const [formValues, setFormValues] = useState({
     buyer: "",
@@ -208,27 +212,40 @@ export function SalesOrdersPage() {
 
     return matchesSearch && isWithinDateRange(order.deliveryDate, dateFrom, dateTo);
   });
+  const paginatedOrders = getPaginatedRows(filteredOrders, currentPage, pageSize);
 
   function handleExport() {
-    const header = ["Order ID", "Delivary Date", "Buyer", "Product", "Quantity", "Unit Price", "Total", "Status"];
-    const rows = filteredOrders.map((order) => [
-      order.id,
-      formatOrderDate(order.deliveryDate),
-      order.buyer,
-      order.product,
-      order.quantity,
-      order.unitPrice,
-      order.total,
-      order.status,
-    ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "sales-orders.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile(
+      "sales-orders.csv",
+      ["Order ID", "Delivary Date", "Buyer", "Product", "Quantity", "Unit Price", "Total", "Status"],
+      filteredOrders.map((order) => [
+        order.id,
+        formatOrderDate(order.deliveryDate),
+        order.buyer,
+        order.product,
+        order.quantity,
+        order.unitPrice,
+        order.total,
+        order.status,
+      ]),
+    );
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Sales Orders",
+      columns: ["Order ID", "Delivary Date", "Buyer", "Product", "Quantity", "Unit Price", "Total", "Status"],
+      rows: filteredOrders.map((order) => [
+        order.id,
+        formatOrderDate(order.deliveryDate),
+        order.buyer,
+        order.product,
+        order.quantity,
+        order.unitPrice,
+        order.total,
+        order.status,
+      ]),
+    });
   }
 
   function openCreateOrderModal() {
@@ -313,6 +330,14 @@ export function SalesOrdersPage() {
             Export
           </button>
           <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
+          </button>
+          <button
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
             onClick={openCreateOrderModal}
             type="button"
@@ -388,7 +413,7 @@ export function SalesOrdersPage() {
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((order) => (
+                paginatedOrders.rows.map((order) => (
                   <tr className="border-b border-[#2d394d] text-[13px] text-[#d7deea]" key={order.recordId}>
                   <td className="py-4 font-semibold text-[#f7a614]">{order.id}</td>
                     <td className="py-4 text-[#98a5bb]">{formatOrderDate(order.deliveryDate)}</td>
@@ -436,6 +461,20 @@ export function SalesOrdersPage() {
             </tbody>
           </table>
         </div>
+
+        {!ordersLoading ? (
+          <TablePagination
+            currentPage={paginatedOrders.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedOrders.pageSize}
+            totalItems={paginatedOrders.totalItems}
+            totalPages={paginatedOrders.totalPages}
+          />
+        ) : null}
       </article>
 
       {isCreateOrderModalOpen ? (

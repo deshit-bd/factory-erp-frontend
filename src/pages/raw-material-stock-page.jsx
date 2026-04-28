@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { createRawMaterialStock, getRawMaterialStocks } from "@/shared/lib/raw-material-stock-api";
+import { downloadCsvFile, getPaginatedRows, openTablePdfWindow } from "@/shared/lib/table-export";
+import { TablePagination } from "@/shared/ui/table-pagination";
 
 function SearchIcon() {
   return (
@@ -97,6 +99,8 @@ export function RawMaterialStockPage() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isAddMaterialModalOpen, setIsAddMaterialModalOpen] = useState(false);
   const [formValues, setFormValues] = useState({
     material: "",
@@ -147,6 +151,7 @@ export function RawMaterialStockPage() {
 
     return matchesSearch && matchesDateFrom && matchesDateTo;
   });
+  const paginatedMaterials = getPaginatedRows(filteredMaterials, currentPage, pageSize);
 
   const totalItems = materials.length;
   const lowStockCount = materials.filter((material) => material.status === "Low Stock").length;
@@ -167,14 +172,24 @@ export function RawMaterialStockPage() {
       material.totalValue,
       material.status,
     ]);
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "raw-material-stock.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsvFile("raw-material-stock.csv", header, rows);
+  }
+
+  function handleDownloadPdf() {
+    openTablePdfWindow({
+      title: "Raw Material Stock",
+      columns: ["ID", "Material", "Category", "Current Stock", "Min Stock", "Unit Cost", "Total Value", "Status"],
+      rows: filteredMaterials.map((material) => [
+        material.id,
+        material.material,
+        material.category,
+        material.currentStock,
+        material.minimumStock,
+        material.unitCost,
+        material.totalValue,
+        material.status,
+      ]),
+    });
   }
 
   function openAddMaterialModal() {
@@ -237,6 +252,14 @@ export function RawMaterialStockPage() {
           >
             <DownloadIcon />
             Export
+          </button>
+          <button
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-[#334156] px-5 text-[14px] font-medium text-white transition hover:bg-[#334156]/40"
+            onClick={handleDownloadPdf}
+            type="button"
+          >
+            <DownloadIcon />
+            Download PDF
           </button>
           <button
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#f6a313] px-5 text-[14px] font-medium text-[#111827] transition hover:bg-[#ffb733]"
@@ -346,7 +369,7 @@ export function RawMaterialStockPage() {
                     Loading raw material stock...
                   </td>
                 </tr>
-              ) : filteredMaterials.map((material) => (
+              ) : paginatedMaterials.rows.map((material) => (
                   <tr
                   className={[
                     "border-b border-[var(--app-border)] text-[13px] text-[var(--app-text)]",
@@ -378,6 +401,20 @@ export function RawMaterialStockPage() {
             </tbody>
           </table>
         </div>
+
+        {!materialsLoading && filteredMaterials.length > 0 ? (
+          <TablePagination
+            currentPage={paginatedMaterials.currentPage}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setCurrentPage(1);
+            }}
+            pageSize={paginatedMaterials.pageSize}
+            totalItems={paginatedMaterials.totalItems}
+            totalPages={paginatedMaterials.totalPages}
+          />
+        ) : null}
       </article>
 
       {isAddMaterialModalOpen ? (
